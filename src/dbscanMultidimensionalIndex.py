@@ -128,7 +128,7 @@ class quickDBSCAN:
 	def ball_average(self, objs, p1):
 		avgDistHelper = []
 		for pixel in objs:
-			if(pixel!=p1):
+			if( (pixel-p1 != 0).any() ): #pixel != p1 in numpy arrays
 				avgDistHelper.append(self.euclideanDistPosition(pixel, p1))
 		avgDistHelper = np.array(avgDistHelper)
 		return sum(avgDistHelper)/len(avgDistHelper)
@@ -189,17 +189,17 @@ class quickDBSCAN:
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
 		if(len(winL)>0 and len(winG)>0):
-			self.quickJoinWin(self.eps, winL, winG, constSmallNumber)
+			self.quickJoinWin(winL, winG, constSmallNumber)
 		if(len(partG)>0):
-			self.quickJoin(self.eps, partL, constSmallNumber)
+			self.quickJoin(partL, constSmallNumber)
 		if(len(partL)>0):
-			self.quickJoin(self.eps, partG, constSmallNumber)
+			self.quickJoin(partG, constSmallNumber)
 
 	def quickJoinWin(self, objs1, objs2, constSmallNumber):
 		print("Intra in win")
 		totalLen = len(objs1) + len(objs2)
 		if(totalLen < constSmallNumber):
-			self.nestedLoop2(self.eps, objs1, objs2)
+			self.nestedLoop2(objs1, objs2)
 			return;
 		allObjects = objs1 + objs2
 		p1 = self.randomObject(allObjects)
@@ -215,7 +215,7 @@ class quickDBSCAN:
 	def nestedLoop(self, objs):
 		for coord1 in objs:
 			for coord2 in objs:
-				if(coord1 != coord2 and self.euclideanDistPosition(coord1, coord2) <= self.eps):
+				if( (coord1-coord2 != 0).any() and self.euclideanDistPosition(coord1, coord2) <= self.eps):
 					#print(pixel1, pixel2)
 					#insert into Mongo
 					self.upsertPixelValue("quickDBSCAN",{"object":[coord1[0], coord1[1]]}, [coord2[0], coord2[1]])
@@ -225,7 +225,7 @@ class quickDBSCAN:
 	def nestedLoop2(self, objs1, objs2):
 		for coord1 in objs1:
 			for coord2 in objs2:
-				if(coord1 != coord2 and self.euclideanDistPosition(coord1, coord2) <= self.eps):
+				if( (coord1-coord2 != 0).any() and self.euclideanDistPosition(coord1, coord2) <= self.eps):
 					#print(pixel1, pixel2)
 					#insert into Mongo
 					self.upsertPixelValue("quickDBSCAN",{"object":[coord1[0], coord1[1]]}, [coord2[0], coord2[1]])
