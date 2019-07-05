@@ -182,7 +182,7 @@ class quickDBSCAN:
 
 	def quickJoin(self, objs, constSmallNumber):
 		if(len(objs) < constSmallNumber):
-			self.nestedLoop(self.eps, objs)
+			self.nestedLoop(objs)
 			return;
 			
 		p1 = self.randomObject(objs)
@@ -216,25 +216,21 @@ class quickDBSCAN:
 		for coord1 in objs:
 			for coord2 in objs:
 				if( (coord1-coord2 != 0).any() and self.euclideanDistPosition(coord1, coord2) <= self.eps):
-					#print(pixel1, pixel2)
-					#insert into Mongo
-					self.upsertPixelValue("quickDBSCAN",{"object":[coord1[0], coord1[1]]}, [coord2[0], coord2[1]])
-					self.upsertPixelValue("quickDBSCAN",{"object":[coord2[0], coord2[1]]}, [coord1[0], coord1[1]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
 
 
 	def nestedLoop2(self, objs1, objs2):
 		for coord1 in objs1:
 			for coord2 in objs2:
 				if( (coord1-coord2 != 0).any() and self.euclideanDistPosition(coord1, coord2) <= self.eps):
-					#print(pixel1, pixel2)
-					#insert into Mongo
-					self.upsertPixelValue("quickDBSCAN",{"object":[coord1[0], coord1[1]]}, [coord2[0], coord2[1]])
-					self.upsertPixelValue("quickDBSCAN",{"object":[coord2[0], coord2[1]]}, [coord1[0], coord1[1]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
 					
 
 
 	def upsertPixelValue(self, collection, filter, epsNeigh):
-		self.mongoConnectInstance.update("quickDBSCAN", filter, {"$push":{"epsNeighs":epsNeigh}})
+		self.mongoConnectInstance.update("quickDBSCAN", filter, {"$push":{"bucket":epsNeigh}}, True)
 			
 if __name__ == '__main__':
 
@@ -274,7 +270,7 @@ if __name__ == '__main__':
 
 	print('DBSCANRtree took '+str(end - start))'''
 
-	dbscan = DBSCAN(1, 5, dataset)
+	'''dbscan = DBSCAN(1, 5, dataset)
 
 	start = time.time()
 
@@ -300,7 +296,7 @@ if __name__ == '__main__':
 
 	end = time.time()
 
-	print('DBSCANKdtree took '+str(end - start))
+	print('DBSCANKdtree took '+str(end - start))'''
 
 	quickDBSCAN = quickDBSCAN(1)
 	quickDBSCAN.quickJoin(datasetQuick, 10)
