@@ -8,6 +8,7 @@ import time
 from scipy import spatial
 import pymongo
 import mongoConnect
+import pprint
 
 
 class DBSCAN:
@@ -218,6 +219,7 @@ class quickDBSCAN:
 				if( (coord1-coord2 != 0).any() and self.euclideanDistPosition(coord1, coord2) <= self.eps):
 					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
 					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
+					self.findAndMerge("quickDBSCAN", coord1)
 
 
 	def nestedLoop2(self, objs1, objs2):
@@ -230,8 +232,12 @@ class quickDBSCAN:
 
 
 	def upsertPixelValue(self, collection, filter, epsNeigh):
-		self.mongoConnectInstance.update("quickDBSCAN", filter, {"$push":{"bucket":epsNeigh}}, True)
-			
+		self.mongoConnectInstance.update(collection, filter, {"$push":{"bucket":epsNeigh}}, True)
+
+	def findAndMerge(self, collection, coord):
+		aggregationString=[{"$match":{"bucket":{"$in":[[coord[0], coord[1]]]}}},{"$group" : {"_id" : "null", "bucket":{"$addToSet":"$bucket"}}}]
+		self.mongoConnectInstance.aggregate(collection, aggregationString)
+
 if __name__ == '__main__':
 
 	sys.setrecursionlimit(15000)
@@ -244,8 +250,8 @@ if __name__ == '__main__':
 	with open(datasetFilename) as csvFile:
 		csvReader = csv.reader(csvFile, delimiter=',')
 		for row in csvReader:
-			dataset.append( (float(row[2]), float(row[3]), 0) )
-			datasetQuick.append( (float(row[2]), float(row[3]), 0) )
+			dataset.append( (float(row[0]), float(row[1]), 0) )
+			datasetQuick.append( (float(row[0]), float(row[1]), 0) )
 
 	dataset = np.array(dataset)
 	datasetQuick = np.array(datasetQuick)

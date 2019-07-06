@@ -30,3 +30,6 @@ class MongoDBConnector:
 
 	def update(self, collection, filter={}, update={}, upsert=True):
 		self.db[collection].update(spec=filter, document=update, upsert=upsert)
+
+	def aggregate(self, collection, aggregationString):
+		self.db[collection].aggregate(aggregationString)
