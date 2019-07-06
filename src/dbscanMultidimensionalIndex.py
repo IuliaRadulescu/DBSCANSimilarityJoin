@@ -138,6 +138,22 @@ class quickDBSCAN:
 		avgDistHelper = np.array(avgDistHelper)
 		return sum(avgDistHelper)/len(avgDistHelper)
 
+	def ball_median(self, objs, p1):
+		#print("len(objs) "+str(len(objs)))
+		avgDistHelper = []
+		for coord1 in objs:
+			for coord2 in objs:
+				if( (coord1-coord2 != 0).any() ): #pixel != p1 in numpy arrays
+					avgDistHelper.append(int(self.euclideanDistPosition(coord1, coord2)))
+		avgDistHelper = np.array(avgDistHelper)
+		return np.median(avgDistHelper)
+
+	def centeroidnp(arr):
+		length = arr.shape[0]
+		sum_x = np.sum(arr[:, 0])
+		sum_y = np.sum(arr[:, 1])
+		return np.array([sum_x/length, sum_y/length])
+
 	def partition(self, objs, p1):
 
 		#print("PARTITION len(objs) "+str(len(objs)))
@@ -147,7 +163,7 @@ class quickDBSCAN:
 		winL = []
 		winG = []
 		
-		r = self.ball_average(objs, p1)
+		r = self.ball_median(objs, p1)
 		startIdx = 0
 		endIdx = len(objs)-1
 		startDist = self.euclideanDistPosition(objs[startIdx], p1)
@@ -295,7 +311,7 @@ if __name__ == '__main__':
 		csvReader = csv.reader(csvFile, delimiter=',')
 		for row in csvReader:
 			dataset.append( (float(row[0]), float(row[1]), 0) )
-			datasetQuick.append( (float(row[0]), float(row[1]), 0) )
+			datasetQuick.append( (float(row[0]), float(row[1])) )
 
 	dataset = np.array(dataset)
 	datasetQuick = np.array(datasetQuick)
