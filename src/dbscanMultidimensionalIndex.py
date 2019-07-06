@@ -9,6 +9,8 @@ from scipy import spatial
 import pymongo
 import mongoConnect
 import pprint
+from bson.objectid import ObjectId
+import matplotlib.pyplot as plt
 
 
 class DBSCAN:
@@ -127,14 +129,19 @@ class quickDBSCAN:
 		return np.linalg.norm(a-b)
 
 	def ball_average(self, objs, p1):
+		#print("len(objs) "+str(len(objs)))
 		avgDistHelper = []
-		for pixel in objs:
-			if( (pixel-p1 != 0).any() ): #pixel != p1 in numpy arrays
-				avgDistHelper.append(self.euclideanDistPosition(pixel, p1))
+		for coord1 in objs:
+			for coord2 in objs:
+				if( (coord1-coord2 != 0).any() ): #pixel != p1 in numpy arrays
+					avgDistHelper.append(self.euclideanDistPosition(coord1, coord2))
 		avgDistHelper = np.array(avgDistHelper)
 		return sum(avgDistHelper)/len(avgDistHelper)
 
 	def partition(self, objs, p1):
+
+		#print("PARTITION len(objs) "+str(len(objs)))
+
 		partL = [] 
 		partG = []
 		winL = []
@@ -182,26 +189,34 @@ class quickDBSCAN:
 		return (objs[0:endIdx], objs[endIdx+1:len(objs)-1], winL, winG)
 
 	def quickJoin(self, objs, constSmallNumber):
+		#print("quick len(objs), constSmallNumber "+str(len(objs))+" "+str(constSmallNumber))
 		if(len(objs) < constSmallNumber):
+			#print("GATA! len(objs) "+str(len(objs)))
 			self.nestedLoop(objs)
-			return;
+			return
 			
 		p1 = self.randomObject(objs)
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
 		if(len(winL)>0 and len(winG)>0):
 			self.quickJoinWin(winL, winG, constSmallNumber)
-		if(len(partG)>0):
-			self.quickJoin(partL, constSmallNumber)
 		if(len(partL)>0):
+			self.quickJoin(partL, constSmallNumber)
+		if(len(partG)>0):
 			self.quickJoin(partG, constSmallNumber)
 
 	def quickJoinWin(self, objs1, objs2, constSmallNumber):
-		print("Intra in win")
+		#print("Intra in win")
 		totalLen = len(objs1) + len(objs2)
-		if(totalLen < constSmallNumber):
+		#print("quickWin len(objs), constSmallNumber "+str(totalLen)+" "+str(constSmallNumber))
+		if(totalLen < constSmallNumber or len(objs1) <= 1 or len(objs2) <= 1):
+			#print("GATA Win! len(objs) "+str(totalLen))
 			self.nestedLoop2(objs1, objs2)
-			return;
+			return
+
+		#print("win len objs1 " + str(len(objs1)))
+		#print("win len objs2 " + str(len(objs2)))
+
 		allObjects = objs1 + objs2
 		p1 = self.randomObject(allObjects)
 
@@ -217,8 +232,9 @@ class quickDBSCAN:
 		for coord1 in objs:
 			for coord2 in objs:
 				if( (coord1-coord2 != 0).any() and self.euclideanDistPosition(coord1, coord2) <= self.eps):
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[],[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
+					self.findAndMerge("quickDBSCAN", coord2)
 					self.findAndMerge("quickDBSCAN", coord1)
 
 
@@ -226,17 +242,45 @@ class quickDBSCAN:
 		for coord1 in objs1:
 			for coord2 in objs2:
 				if( (coord1-coord2 != 0).any() and self.euclideanDistPosition(coord1, coord2) <= self.eps):
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
-					
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
+					self.findAndMerge("quickDBSCAN", coord2)
+					self.findAndMerge("quickDBSCAN", coord1)					
 
 
 	def upsertPixelValue(self, collection, filter, epsNeigh):
 		self.mongoConnectInstance.update(collection, filter, {"$push":{"bucket":epsNeigh}}, True)
 
 	def findAndMerge(self, collection, coord):
-		aggregationString=[{"$match":{"bucket":{"$in":[[coord[0], coord[1]]]}}},{"$group" : {"_id" : "null", "bucket":{"$addToSet":"$bucket"}}}]
-		self.mongoConnectInstance.aggregate(collection, aggregationString)
+		#aggregate the results
+		if(self.mongoConnectInstance.count(collection, {"bucket":{"$in":[[coord[0], coord[1]]]}}) <= 3):
+			return
+		aggregationString=[{"$match":{"bucket":{"$in":[[coord[0], coord[1]]]}}},{"$unwind": "$bucket"},{"$group" : {"_id" : ObjectId(), "bucket":{"$addToSet":"$bucket"}}}]
+		aggregationResult = self.mongoConnectInstance.aggregate(collection, aggregationString)
+		aggregationResultList = list(aggregationResult)
+		
+		print("Aggregation")
+		#remove all other documents - we aggregated them
+		print("Count before remove: "+str(self.mongoConnectInstance.count(collection, {})))
+		self.mongoConnectInstance.remove(collection, {"bucket":{"$in":[[coord[0], coord[1]]]}})
+		print("Count after remove: "+str(self.mongoConnectInstance.count(collection, {})))
+		#insert the aggregated document
+		for document in aggregationResultList:
+			print("Document")
+			self.mongoConnectInstance.insert(collection, document)
+
+	def plotClusters(self):
+		cursor = self.mongoConnectInstance.getRecords("quickDBSCAN", {}, {"bucket"})
+		for document in cursor:
+			print(document)
+			coordsInDocument = list()
+			for (x, y) in document["bucket"]:
+				coordsInDocument.append((x,y))
+			coordsInDocument = set(coordsInDocument)
+			color = np.random.rand(3,)
+			for (x, y) in coordsInDocument:
+				plt.scatter(x, y, c=color)
+		plt.show()
 
 if __name__ == '__main__':
 
@@ -304,8 +348,9 @@ if __name__ == '__main__':
 
 	print('DBSCANKdtree took '+str(end - start))'''
 
-	quickDBSCAN = quickDBSCAN(1)
+	quickDBSCAN = quickDBSCAN(5)
 	quickDBSCAN.quickJoin(datasetQuick, 10)
+	quickDBSCAN.plotClusters()
 
 
 

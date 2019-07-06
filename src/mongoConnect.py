@@ -32,4 +32,13 @@ class MongoDBConnector:
 		self.db[collection].update(spec=filter, document=update, upsert=upsert)
 
 	def aggregate(self, collection, aggregationString):
-		self.db[collection].aggregate(aggregationString)
+		return self.db[collection].aggregate(pipeline = aggregationString)
+
+	def insert(self, collection, document):
+		self.db[collection].insert_one(document)
+
+	def remove(self, collection, filter):
+		self.db[collection].delete_many(filter)
+
+	def count(self, collection, filter):
+		return self.db[collection].count(filter)
