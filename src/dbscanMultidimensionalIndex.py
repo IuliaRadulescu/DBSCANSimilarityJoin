@@ -4,6 +4,7 @@ import collections
 from random import randint
 import numpy as np
 import time
+import math
 #import rtree.index
 from scipy import spatial
 import pymongo
@@ -11,6 +12,7 @@ import mongoConnect
 import pprint
 from bson.objectid import ObjectId
 import matplotlib.pyplot as plt
+from scipy.signal import argrelextrema
 
 
 class DBSCAN:
@@ -125,14 +127,23 @@ class quickDBSCAN:
 		randomIndex = randint(0, len(objs)-1)
 		return objs[randomIndex]
 
-	def euclideanDistPosition(self, a, b):
+	def euclideanDistPositionNumpy(self, a, b):
 		return np.linalg.norm(a-b)
+
+	def euclideanDistPosition(self, a, b):
+		return math.sqrt( (a[0] - b[0])**2 + (a[1] - b[1])**2 )
+
+	def areEqual(self, a, b):
+		if (a[0] == b[0] and a[1] == b[1]):
+			return True
+		else:
+			return False
 
 	def ball_average(self, objs, p1):
 		#print("len(objs) "+str(len(objs)))
 		avgDistHelper = []
 		for coord1 in objs:
-			if( (coord1-p1!= 0).any() ): #pixel != p1 in numpy arrays
+			if( areEqual(coord1, p1) == False ): #pixel != p1 in numpy arrays
 				avgDistHelper.append(self.euclideanDistPosition(coord1, p1))
 		avgDistHelper = np.array(avgDistHelper)
 		return sum(avgDistHelper)/len(avgDistHelper)
@@ -151,7 +162,15 @@ class quickDBSCAN:
 		length = arr.shape[0]
 		sum_x = np.sum(arr[:, 0])
 		sum_y = np.sum(arr[:, 1])
-		return np.array([ (sum_x/length, sum_y/length) ])
+		return [sum_x/length, sum_y/length]
+
+	def medoidnp(self, objs):
+		distMatrix = np.zeros((len(objs), len(objs)))
+		for i in range(len(objs)):
+			for j in range(len(objs)):
+				distMatrix[i, j] = self.euclideanDistPosition(objs[i], objs[j])
+		distMatrix = np.array(distMatrix)
+		return objs[np.argmin(distMatrix.sum(axis=0))]
 
 	def furthestPivot(self, objs):
 		helper = self.randomObject(objs)
@@ -164,7 +183,7 @@ class quickDBSCAN:
 				pivot = obj
 		return pivot
 
-	def furthestPivotDistance(self, objs, p1):
+	def farthestObjectPivotDistance(self, objs, p1):
 		maxDist = 0
 		for obj in objs:
 			dist = self.euclideanDistPosition(obj, p1)
@@ -172,17 +191,18 @@ class quickDBSCAN:
 				maxDist = dist
 		return maxDist/2
 
-	def partition(self, objs, p1):
+	def partition(self, objs, p1, pivotTrialCount = 0):
 		#print("PARTITION len(objs) "+str(len(objs)))
 		partL = [] 
 		partG = []
 		winL = []
 		winG = []
-		
 		#sorted as reffering to p1
-		objs = np.array(sorted(objs, key=lambda x: (x[0] - p1[0]) ** 2 + (x[1] - p1[1]) ** 2))
+		#objs = np.array(sorted(objs, key=lambda x: math.sqrt((x[0] - 0) ** 2 + (x[1] - 0) ** 2)))
 
-		r = self.furthestPivotDistance(objs, p1)
+		print("p1 = "+str(p1)+" len objs = "+ str(len(objs)))
+
+		r = self.farthestObjectPivotDistance(objs, p1)
 		print("r is "+str(r))
 		startIdx = 0
 		endIdx = len(objs)-1
@@ -222,33 +242,52 @@ class quickDBSCAN:
 			if(endDist > r):
 				endIdx = endIdx - 1
 
-		'''sumaBucati = len(objs[0:endIdx]) + len(objs[endIdx+1:len(objs)-1]) + len(winL) + len(winG)
-		print("Cine e endIdx "+str(endIdx))
-		print("L " + str(len(objs[0:endIdx])))
-		print("G " + str(len(objs[endIdx+1:len(objs)-1])))
-		print("WINL " + str(len(winL)))
-		print("WING " + str(len(winG)))
-		print("Suma bucatilor din prima partitionare " + str(sumaBucati))
-		print("Cu cate obiecte am pornit " + str(len(objs)))'''
-				
+		winL = np.array(winL)
+		winG = np.array(winG)
+
+		print("===================================OBJS after")
+		print(str(objs))
+		print("===================================OBJS end")
+
+		#if I tried to find a good partitioning - no zeros, but I reached the 10th trial, stop
+		if(pivotTrialCount >= 10):
+			return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
+
+		#if one part of the array is 0, we need a different partitioning to avoid loops
+		if(len(objs[0:endIdx])==0 or len(objs[endIdx:len(objs)])==0):
+			p1 = self.randomObject(objs)
+			pivotTrialCount = pivotTrialCount + 1
+			self.partition(objs, p1, pivotTrialCount)
+
 		return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
 
 	def quickJoin(self, objs, constSmallNumber):
 		print("quick len(objs), constSmallNumber "+str(len(objs))+" "+str(constSmallNumber))
+		if(len(objs) == 0):
+			return
 		if(len(objs) < constSmallNumber):
 			#print("GATA! len(objs) "+str(len(objs)))
 			self.nestedLoop(objs)
 			return
-		#p1 = self.randomObject(objs)
+
 		p1 = self.randomObject(objs)
+		#p1 = objs.max(axis=0)
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
 		
 		#if(len(winL)>0 and len(winG)>0):
 		self.quickJoinWin(winL, winG, constSmallNumber)
-		#if(len(partL)>0):
+
+		#if one of the partitions is 0, just stop and do the nested loop on the other one
+		if(len(partL) == 0):
+			self.nestedLoop(partG)
+			return
+
+		if(len(partG) == 0):
+			self.nestedLoop(partL)
+			return
+
 		self.quickJoin(partL, constSmallNumber)
-		#if(len(partG)>0):
 		self.quickJoin(partG, constSmallNumber)
 
 	def quickJoinWin(self, objs1, objs2, constSmallNumber):
@@ -276,9 +315,9 @@ class quickDBSCAN:
 		#print("win len objs2 " + str(len(objs2)))
 
 		allObjects = np.concatenate((objs1, objs2), axis=0)
-		#p1 = self.randomObject(allObjects)
 
 		p1 = self.randomObject(allObjects)
+		#p1 = allObjects.max(axis=0)
 
 		(partL1, partG1, winL1, winG1) = self.partition(objs1, p1)
 		(partL2, partG2, winL2, winG2) = self.partition(objs2, p1)
@@ -291,25 +330,25 @@ class quickDBSCAN:
 	def nestedLoop(self, objs):
 		for coord1 in objs:
 			for coord2 in objs:
-				if( (coord1-coord2 != 0).any() and self.euclideanDistPosition(coord1, coord2) <= self.eps):
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[],[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
-					self.findAndMerge("quickDBSCAN", coord2)
-					self.findAndMerge("quickDBSCAN", coord1)
+				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and  self.euclideanDistPosition(coord1, coord2) != 0):
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[],[coord1[0], coord1[1]]]}}, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					#self.findAndMerge("quickDBSCAN", coord2)
+					#self.findAndMerge("quickDBSCAN", coord1)
 
 
 	def nestedLoop2(self, objs1, objs2):
 		for coord1 in objs1:
 			for coord2 in objs2:
-				if( (coord1-coord2 != 0).any() and self.euclideanDistPosition(coord1, coord2) <= self.eps):
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
-					self.findAndMerge("quickDBSCAN", coord2)
-					self.findAndMerge("quickDBSCAN", coord1)					
+				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and self.euclideanDistPosition(coord1, coord2) != 0):
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord1[0], coord1[1]]]}}, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					#self.findAndMerge("quickDBSCAN", coord2)
+					#self.findAndMerge("quickDBSCAN", coord1)					
 
 
 	def upsertPixelValue(self, collection, filter, epsNeigh):
-		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":epsNeigh}}, True)
+		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":{"$each":epsNeigh}}}, True)
 
 	def findAndMerge(self, collection, coord):
 		#aggregate the results
@@ -413,12 +452,9 @@ if __name__ == '__main__':
 
 	print('DBSCANKdtree took '+str(end - start))'''
 
-	quickDBSCAN = quickDBSCAN(5)
-	#sort dataset
-	#ref = (0, 0)
-	#datasetQuick = np.array(sorted(datasetQuick, key=lambda x: (x[0] - ref[0]) ** 2 + (x[1] - ref[1]) ** 2))
+	quickDBSCAN = quickDBSCAN(4)
 	quickDBSCAN.quickJoin(datasetQuick, 10)
-	quickDBSCAN.finalFindAndMerge(datasetQuick)
+	#quickDBSCAN.finalFindAndMerge(datasetQuick)
 	quickDBSCAN.plotClusters()
 
 
