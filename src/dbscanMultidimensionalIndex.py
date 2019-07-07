@@ -331,8 +331,8 @@ class quickDBSCAN:
 		for coord1 in objs:
 			for coord2 in objs:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and  self.euclideanDistPosition(coord1, coord2) != 0):
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[],[coord1[0], coord1[1]]]}}, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[],[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
 					#self.findAndMerge("quickDBSCAN", coord2)
 					#self.findAndMerge("quickDBSCAN", coord1)
 
@@ -341,8 +341,8 @@ class quickDBSCAN:
 		for coord1 in objs1:
 			for coord2 in objs2:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and self.euclideanDistPosition(coord1, coord2) != 0):
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord1[0], coord1[1]]]}}, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
+					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
 					#self.findAndMerge("quickDBSCAN", coord2)
 					#self.findAndMerge("quickDBSCAN", coord1)					
 
