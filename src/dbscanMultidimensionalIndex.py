@@ -127,10 +127,10 @@ class quickDBSCAN:
 		randomIndex = randint(0, len(objs)-1)
 		return objs[randomIndex]
 
-	def euclideanDistPositionNumpy(self, a, b):
+	def euclideanDistPosition(self, a, b):
 		return np.linalg.norm(a-b)
 
-	def euclideanDistPosition(self, a, b):
+	def euclideanDistPositionOld(self, a, b):
 		return math.sqrt( (a[0] - b[0])**2 + (a[1] - b[1])**2 )
 
 	def areEqual(self, a, b):
@@ -198,8 +198,7 @@ class quickDBSCAN:
 		winL = []
 		winG = []
 		#sorted as reffering to p1
-		#objs = np.array(sorted(objs, key=lambda x: math.sqrt((x[0] - 0) ** 2 + (x[1] - 0) ** 2)))
-
+		#objs = np.array(sorted(objs, key=lambda x: math.sqrt((x[0] - p1[0]) ** 2 + (x[1] - p1[1]) ** 2)))
 		print("p1 = "+str(p1)+" len objs = "+ str(len(objs)))
 
 		r = self.farthestObjectPivotDistance(objs, p1)
@@ -228,7 +227,7 @@ class quickDBSCAN:
 				if(startDist <= r+self.eps):
 					winG.append(objs[startIdx])
 				#exchange items
-				objs[startIdx], objs[endIdx] = objs[endIdx], objs[startIdx]
+				objs[[startIdx, endIdx]] = objs[[endIdx, startIdx]]
 				startIdx = startIdx + 1
 				endIdx = endIdx - 1
 				startDist = self.euclideanDistPosition(objs[startIdx], p1)
@@ -333,8 +332,8 @@ class quickDBSCAN:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and  self.euclideanDistPosition(coord1, coord2) != 0):
 					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[],[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
 					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
-					#self.findAndMerge("quickDBSCAN", coord2)
-					#self.findAndMerge("quickDBSCAN", coord1)
+					self.findAndMerge("quickDBSCAN", coord2)
+					self.findAndMerge("quickDBSCAN", coord1)
 
 
 	def nestedLoop2(self, objs1, objs2):
@@ -343,12 +342,12 @@ class quickDBSCAN:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and self.euclideanDistPosition(coord1, coord2) != 0):
 					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
 					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
-					#self.findAndMerge("quickDBSCAN", coord2)
-					#self.findAndMerge("quickDBSCAN", coord1)					
+					self.findAndMerge("quickDBSCAN", coord2)
+					self.findAndMerge("quickDBSCAN", coord1)					
 
 
 	def upsertPixelValue(self, collection, filter, epsNeigh):
-		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":{"$each":epsNeigh}}}, True)
+		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":epsNeigh}}, True)
 
 	def findAndMerge(self, collection, coord):
 		#aggregate the results
@@ -454,7 +453,7 @@ if __name__ == '__main__':
 
 	quickDBSCAN = quickDBSCAN(4)
 	quickDBSCAN.quickJoin(datasetQuick, 10)
-	#quickDBSCAN.finalFindAndMerge(datasetQuick)
+	quickDBSCAN.finalFindAndMerge(datasetQuick)
 	quickDBSCAN.plotClusters()
 
 
