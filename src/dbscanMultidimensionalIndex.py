@@ -153,16 +153,36 @@ class quickDBSCAN:
 		sum_y = np.sum(arr[:, 1])
 		return np.array([ (sum_x/length, sum_y/length) ])
 
+	def furthestPivot(self, objs):
+		helper = self.randomObject(objs)
+		maxDist = 0
+		pivot = None
+		for obj in objs:
+			dist = self.euclideanDistPosition(obj, helper)
+			if(dist > maxDist):
+				maxDist = dist
+				pivot = obj
+		return pivot
+
+	def furthestPivotDistance(self, objs, p1):
+		maxDist = 0
+		for obj in objs:
+			dist = self.euclideanDistPosition(obj, p1)
+			if(dist > maxDist):
+				maxDist = dist
+		return maxDist/2
+
 	def partition(self, objs, p1):
-
 		#print("PARTITION len(objs) "+str(len(objs)))
-
 		partL = [] 
 		partG = []
 		winL = []
 		winG = []
 		
-		r = self.ball_average(objs, p1)
+		#sorted as reffering to p1
+		objs = np.array(sorted(objs, key=lambda x: (x[0] - p1[0]) ** 2 + (x[1] - p1[1]) ** 2))
+
+		r = self.furthestPivotDistance(objs, p1)
 		print("r is "+str(r))
 		startIdx = 0
 		endIdx = len(objs)-1
@@ -201,8 +221,17 @@ class quickDBSCAN:
 				winL.append(objs[startIdx])
 			if(endDist > r):
 				endIdx = endIdx - 1
+
+		'''sumaBucati = len(objs[0:endIdx]) + len(objs[endIdx+1:len(objs)-1]) + len(winL) + len(winG)
+		print("Cine e endIdx "+str(endIdx))
+		print("L " + str(len(objs[0:endIdx])))
+		print("G " + str(len(objs[endIdx+1:len(objs)-1])))
+		print("WINL " + str(len(winL)))
+		print("WING " + str(len(winG)))
+		print("Suma bucatilor din prima partitionare " + str(sumaBucati))
+		print("Cu cate obiecte am pornit " + str(len(objs)))'''
 				
-		return (objs[0:endIdx], objs[endIdx+1:len(objs)-1], winL, winG)
+		return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
 
 	def quickJoin(self, objs, constSmallNumber):
 		print("quick len(objs), constSmallNumber "+str(len(objs))+" "+str(constSmallNumber))
@@ -210,33 +239,46 @@ class quickDBSCAN:
 			#print("GATA! len(objs) "+str(len(objs)))
 			self.nestedLoop(objs)
 			return
-			
 		#p1 = self.randomObject(objs)
-		p1 = self.centeroidnp(objs)
+		p1 = self.randomObject(objs)
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
-		if(len(winL)>0 and len(winG)>0):
-			self.quickJoinWin(winL, winG, constSmallNumber)
-		if(len(partL)>0):
-			self.quickJoin(partL, constSmallNumber)
-		if(len(partG)>0):
-			self.quickJoin(partG, constSmallNumber)
+		
+		#if(len(winL)>0 and len(winG)>0):
+		self.quickJoinWin(winL, winG, constSmallNumber)
+		#if(len(partL)>0):
+		self.quickJoin(partL, constSmallNumber)
+		#if(len(partG)>0):
+		self.quickJoin(partG, constSmallNumber)
 
 	def quickJoinWin(self, objs1, objs2, constSmallNumber):
 		print("Intra in win")
 		totalLen = len(objs1) + len(objs2)
-		print("quickWin len(objs), constSmallNumber "+str(totalLen)+" "+str(constSmallNumber))
-		if(totalLen < constSmallNumber or len(objs1) <= 1 or len(objs2) <= 1):
+		print("win len(objs), constSmallNumber "+str(totalLen)+" "+str(constSmallNumber))
+		if(totalLen < constSmallNumber):
 			#print("GATA Win! len(objs) "+str(totalLen))
 			self.nestedLoop2(objs1, objs2)
 			return
+
+		if(len(objs1) <= 1):
+			if(len(objs1) == 1):
+				self.nestedLoop2(objs1, objs2)
+			self.nestedLoop(objs2)
+			return
+
+		if(len(objs2) <= 1):
+			if(len(objs2) == 1):
+				self.nestedLoop2(objs1, objs2)
+			self.nestedLoop(objs1)
+			return	
+
 		#print("win len objs1 " + str(len(objs1)))
 		#print("win len objs2 " + str(len(objs2)))
 
-		allObjects = objs1 + objs2
+		allObjects = np.concatenate((objs1, objs2), axis=0)
 		#p1 = self.randomObject(allObjects)
 
-		p1 = self.centeroidnp(allObjects)
+		p1 = self.randomObject(allObjects)
 
 		(partL1, partG1, winL1, winG1) = self.partition(objs1, p1)
 		(partL2, partG2, winL2, winG2) = self.partition(objs2, p1)
@@ -371,7 +413,10 @@ if __name__ == '__main__':
 
 	print('DBSCANKdtree took '+str(end - start))'''
 
-	quickDBSCAN = quickDBSCAN(1)
+	quickDBSCAN = quickDBSCAN(5)
+	#sort dataset
+	#ref = (0, 0)
+	#datasetQuick = np.array(sorted(datasetQuick, key=lambda x: (x[0] - ref[0]) ** 2 + (x[1] - ref[1]) ** 2))
 	quickDBSCAN.quickJoin(datasetQuick, 10)
 	quickDBSCAN.finalFindAndMerge(datasetQuick)
 	quickDBSCAN.plotClusters()
