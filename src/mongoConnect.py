@@ -28,8 +28,8 @@ class MongoDBConnector:
 	def getRecord(self, collection, filter={}, projection={}):
 		return self.db[collection].find_one(filter=filter, projection=projection)
 
-	def update(self, collection, filter={}, update={}, upsert=True):
-		self.db[collection].update(spec=filter, document=update, upsert=upsert)
+	def update(self, collection, filter={}, update={}, upsert=True, multi=True):
+		self.db[collection].update(spec=filter, document=update, upsert=upsert, multi=multi)
 
 	def aggregate(self, collection, aggregationString):
 		return self.db[collection].aggregate(pipeline = aggregationString)

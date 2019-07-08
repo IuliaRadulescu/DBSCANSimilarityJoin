@@ -127,10 +127,10 @@ class quickDBSCAN:
 		randomIndex = randint(0, len(objs)-1)
 		return objs[randomIndex]
 
-	def euclideanDistPosition(self, a, b):
+	def euclideanDistPositionNumpy(self, a, b):
 		return np.linalg.norm(a-b)
 
-	def euclideanDistPositionOld(self, a, b):
+	def euclideanDistPosition(self, a, b):
 		return math.sqrt( (a[0] - b[0])**2 + (a[1] - b[1])**2 )
 
 	def areEqual(self, a, b):
@@ -143,7 +143,7 @@ class quickDBSCAN:
 		#print("len(objs) "+str(len(objs)))
 		avgDistHelper = []
 		for coord1 in objs:
-			if( areEqual(coord1, p1) == False ): #pixel != p1 in numpy arrays
+			if( (coord1-p1!= 0).any() ): #pixel != p1 in numpy arrays
 				avgDistHelper.append(self.euclideanDistPosition(coord1, p1))
 		avgDistHelper = np.array(avgDistHelper)
 		return sum(avgDistHelper)/len(avgDistHelper)
@@ -197,11 +197,10 @@ class quickDBSCAN:
 		partG = []
 		winL = []
 		winG = []
-		#sorted as reffering to p1
-		#objs = np.array(sorted(objs, key=lambda x: math.sqrt((x[0] - p1[0]) ** 2 + (x[1] - p1[1]) ** 2)))
+		
 		print("p1 = "+str(p1)+" len objs = "+ str(len(objs)))
 
-		r = self.farthestObjectPivotDistance(objs, p1)
+		r = round(self.ball_average(objs, p1), 2)
 		print("r is "+str(r))
 		startIdx = 0
 		endIdx = len(objs)-1
@@ -248,16 +247,6 @@ class quickDBSCAN:
 		print(str(objs))
 		print("===================================OBJS end")
 
-		#if I tried to find a good partitioning - no zeros, but I reached the 10th trial, stop
-		if(pivotTrialCount >= 10):
-			return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
-
-		#if one part of the array is 0, we need a different partitioning to avoid loops
-		if(len(objs[0:endIdx])==0 or len(objs[endIdx:len(objs)])==0):
-			p1 = self.randomObject(objs)
-			pivotTrialCount = pivotTrialCount + 1
-			self.partition(objs, p1, pivotTrialCount)
-
 		return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
 
 	def quickJoin(self, objs, constSmallNumber):
@@ -269,8 +258,9 @@ class quickDBSCAN:
 			self.nestedLoop(objs)
 			return
 
-		p1 = self.randomObject(objs)
+		#p1 = self.randomObject(objs)
 		#p1 = objs.max(axis=0)
+		p1 = self.centeroidnp(objs)
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
 		
@@ -286,6 +276,8 @@ class quickDBSCAN:
 			self.nestedLoop(partL)
 			return
 
+		print("quickjoin, trece mai departe cu "+str(len(partL))+" "+str(len(partG)))
+
 		self.quickJoin(partL, constSmallNumber)
 		self.quickJoin(partG, constSmallNumber)
 
@@ -293,6 +285,9 @@ class quickDBSCAN:
 		print("Intra in win")
 		totalLen = len(objs1) + len(objs2)
 		print("win len(objs), constSmallNumber "+str(totalLen)+" "+str(constSmallNumber))
+		if (totalLen == 0):
+			return
+
 		if(totalLen < constSmallNumber):
 			#print("GATA Win! len(objs) "+str(totalLen))
 			self.nestedLoop2(objs1, objs2)
@@ -302,12 +297,14 @@ class quickDBSCAN:
 			if(len(objs1) == 1):
 				self.nestedLoop2(objs1, objs2)
 			self.nestedLoop(objs2)
+			print("quickjoinWIN, se opreste cu "+str(len(objs1))+" "+str(len(objs2)))
 			return
 
 		if(len(objs2) <= 1):
 			if(len(objs2) == 1):
 				self.nestedLoop2(objs1, objs2)
 			self.nestedLoop(objs1)
+			print("quickjoinWIN, se opreste cu "+str(len(objs1))+" "+str(len(objs2)))
 			return	
 
 		#print("win len objs1 " + str(len(objs1)))
@@ -315,11 +312,24 @@ class quickDBSCAN:
 
 		allObjects = np.concatenate((objs1, objs2), axis=0)
 
-		p1 = self.randomObject(allObjects)
+		#p1 = self.randomObject(allObjects)
 		#p1 = allObjects.max(axis=0)
+		p1 = self.centeroidnp(allObjects)
+
+		print("quickjoinWIN, trece mai departe cu "+str(len(objs1))+" "+str(len(objs2)))
 
 		(partL1, partG1, winL1, winG1) = self.partition(objs1, p1)
 		(partL2, partG2, winL2, winG2) = self.partition(objs2, p1)
+
+		#print("quickjoinWIN, parturile intermediare "+str(len(partL1))+" "+str(len(partL2))+" "+str(len(partG1))+" "+str(len(partG2))+" "+str(len(winL1))+" "+str(len(winL2))+" "+str(len(winG1))+" "+str(len(winG2)))
+
+		#if any of the pairs contains a zero, switch to brute force
+		if (len(partL1) == 0 or len(partL2) == 0 or len(partG1) == 0 or len(partG2) == 0):
+			self.nestedLoop2(winL1, winG2)
+			self.nestedLoop2(winG1, winL2)
+			self.nestedLoop2(partL1, partL2)
+			self.nestedLoop2(partG1, partG2)
+			return
 
 		self.quickJoinWin(winL1, winG2, constSmallNumber)
 		self.quickJoinWin(winG1, winL2, constSmallNumber)
@@ -330,37 +340,37 @@ class quickDBSCAN:
 		for coord1 in objs:
 			for coord2 in objs:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and  self.euclideanDistPosition(coord1, coord2) != 0):
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[],[coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
-					self.findAndMerge("quickDBSCAN", coord2)
-					self.findAndMerge("quickDBSCAN", coord1)
+					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					#self.findAndMerge("quickDBSCAN", coord2)
+					#self.findAndMerge("quickDBSCAN", coord1)
 
 
 	def nestedLoop2(self, objs1, objs2):
 		for coord1 in objs1:
 			for coord2 in objs2:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and self.euclideanDistPosition(coord1, coord2) != 0):
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord1[0], coord1[1]]]}}, [coord2[0], coord2[1]])
-					self.upsertPixelValue("quickDBSCAN",{"bucket":{"$in":[[], [coord2[0], coord2[1]]]}}, [coord1[0], coord1[1]])
-					self.findAndMerge("quickDBSCAN", coord2)
-					self.findAndMerge("quickDBSCAN", coord1)					
+					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					#self.findAndMerge("quickDBSCAN", coord2)
+					#self.findAndMerge("quickDBSCAN", coord1)					
 
 
 	def upsertPixelValue(self, collection, filter, epsNeigh):
-		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":epsNeigh}}, True)
+		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":{"$each":epsNeigh}}}, True, True)
 
 	def findAndMerge(self, collection, coord):
 		#aggregate the results
-		if(self.mongoConnectInstance.count(collection, {"bucket":{"$in":[[coord[0], coord[1]]]}}) <= 1):
+		if(self.mongoConnectInstance.count(collection, {"bucket": [coord[0], coord[1]] } ) <= 1):
 			return
-		aggregationString=[{"$match":{"bucket":{"$in":[[coord[0], coord[1]]]}}},{"$unwind": "$bucket"},{"$group" : {"_id" : ObjectId(), "bucket":{"$addToSet":"$bucket"}}}]
+		aggregationString=[{"$match": {"bucket": [coord[0], coord[1]] } },{"$unwind": "$bucket"},{"$group" : {"_id" : ObjectId(), "bucket":{"$addToSet":"$bucket"}}}]
 		aggregationResult = self.mongoConnectInstance.aggregate(collection, aggregationString)
 		aggregationResultList = list(aggregationResult)
 		
 		print("Aggregation")
 		#remove all other documents - we aggregated them
 		print("Count before remove: "+str(self.mongoConnectInstance.count(collection, {})))
-		self.mongoConnectInstance.remove(collection, {"bucket":{"$in":[[coord[0], coord[1]]]}})
+		self.mongoConnectInstance.remove(collection, {"bucket": [coord[0], coord[1]] })
 		print("Count after remove: "+str(self.mongoConnectInstance.count(collection, {})))
 		#insert the aggregated document
 		for document in aggregationResultList:
@@ -451,7 +461,7 @@ if __name__ == '__main__':
 
 	print('DBSCANKdtree took '+str(end - start))'''
 
-	quickDBSCAN = quickDBSCAN(4)
+	quickDBSCAN = quickDBSCAN(4.5)
 	quickDBSCAN.quickJoin(datasetQuick, 10)
 	quickDBSCAN.finalFindAndMerge(datasetQuick)
 	quickDBSCAN.plotClusters()
