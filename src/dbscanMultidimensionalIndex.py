@@ -123,6 +123,8 @@ class quickDBSCAN:
 		self.eps = eps
 		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB");
 
+		self.allPairs = []
+
 	def randomObject(self, objs):
 		randomIndex = randint(0, len(objs)-1)
 		return objs[randomIndex]
@@ -146,7 +148,7 @@ class quickDBSCAN:
 			if( (coord1-p1!= 0).any() ): #pixel != p1 in numpy arrays
 				avgDistHelper.append(self.euclideanDistPosition(coord1, p1))
 		avgDistHelper = np.array(avgDistHelper)
-		return sum(avgDistHelper)/len(avgDistHelper)
+		return round(sum(avgDistHelper)/len(avgDistHelper), 2)
 
 	def ball_median(self, objs, p1):
 		#print("len(objs) "+str(len(objs)))
@@ -162,7 +164,7 @@ class quickDBSCAN:
 		length = arr.shape[0]
 		sum_x = np.sum(arr[:, 0])
 		sum_y = np.sum(arr[:, 1])
-		return [sum_x/length, sum_y/length]
+		return [round(sum_x/length, 2), round(sum_y/length, 2)]
 
 	def medoidnp(self, objs):
 		distMatrix = np.zeros((len(objs), len(objs)))
@@ -191,7 +193,7 @@ class quickDBSCAN:
 				maxDist = dist
 		return maxDist/2
 
-	def partition(self, objs, p1, pivotTrialCount = 0):
+	def partition(self, objs, p1):
 		#print("PARTITION len(objs) "+str(len(objs)))
 		partL = [] 
 		partG = []
@@ -202,50 +204,71 @@ class quickDBSCAN:
 
 		r = round(self.ball_average(objs, p1), 2)
 		print("r is "+str(r))
+		#r must not be smaller than eps, it breaks things
+		if(r < self.eps):
+			r = r + 1.5*self.eps
+		print("new r is "+str(r))
 		startIdx = 0
 		endIdx = len(objs)-1
-		startDist = self.euclideanDistPosition(objs[startIdx], p1)
-		endDist = self.euclideanDistPosition(objs[endIdx], p1)
+		startDist = round(self.euclideanDistPosition(objs[startIdx], p1),2)
+		endDist = round(self.euclideanDistPosition(objs[endIdx], p1), 2)
 		
+		#enspe mii de helperi care tin copii ca sa ma asigur ca nu se apendeaza referinte
+		#pentru ca python :(
+
 		while(startIdx < endIdx):
 			while(endDist > r and startIdx < endIdx):
 				if(endDist <= r+self.eps):
-					winG.append(objs[endIdx])
+					helper1 = np.copy(objs[endIdx])
+					winG.append(helper1)
 				endIdx = endIdx - 1
-				endDist = self.euclideanDistPosition(objs[endIdx], p1)
+				endDist = round(self.euclideanDistPosition(objs[endIdx], p1),2)
 				
 			while(startDist <= r and startIdx < endIdx):
-				if(startDist >= r-self.eps):
-					winL.append(objs[startIdx])
+				if(startDist >= round(r-self.eps,2)):
+					helper2 = np.copy(objs[startIdx])
+					winL.append(helper2)
 				startIdx = startIdx + 1
-				startDist = self.euclideanDistPosition(objs[startIdx], p1)
+				startDist = round(self.euclideanDistPosition(objs[startIdx], p1),2)
 				
 			if(startIdx < endIdx):
-				if(endDist >= r-self.eps):
-					winL.append(objs[endIdx])
+				print("Pentru "+str(objs[endIdx])+" endDist este "+str(endDist)+" iar r-eps este "+str(r-self.eps))
+				if(endDist >= round(r-self.eps,2)):
+					print("Il apendeaza pe "+str(objs[endIdx]))
+					helper3 = np.copy(objs[endIdx])
+					winL.append(helper3)
 				if(startDist <= r+self.eps):
-					winG.append(objs[startIdx])
+					helper4 = np.copy(objs[startIdx])
+					winG.append(helper4)
 				#exchange items
 				objs[[startIdx, endIdx]] = objs[[endIdx, startIdx]]
 				startIdx = startIdx + 1
 				endIdx = endIdx - 1
-				startDist = self.euclideanDistPosition(objs[startIdx], p1)
-				endDist = self.euclideanDistPosition(objs[endIdx], p1)
+				startDist = round(self.euclideanDistPosition(objs[startIdx], p1),2)
+				endDist = round(self.euclideanDistPosition(objs[endIdx], p1),2)
 		
 		if(startIdx == endIdx):
 			if(endDist > r and endDist <= r+self.eps):
-				winG.append(objs[endIdx])
-			if(startDist <= r and startDist >= r-self.eps):
-				winL.append(objs[startIdx])
+				helper5 = np.copy(objs[endIdx])
+				winG.append(helper5)
+			if(startDist <= r and startDist >= round(r-self.eps,2)):
+				helper6 = np.copy(objs[startIdx])
+				winL.append(helper6)
 			if(endDist > r):
 				endIdx = endIdx - 1
 
 		winL = np.array(winL)
 		winG = np.array(winG)
 
-		print("===================================OBJS after")
-		print(str(objs))
-		print("===================================OBJS end")
+		print("========================= WIN L ===================")
+		print(winL)
+		print("========================= WIN L END ===================")
+
+		print("========================= WIN G ===================")
+		print(winG)
+		print("========================= WIN G END ===================")
+
+
 
 		return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
 
@@ -270,19 +293,18 @@ class quickDBSCAN:
 		#if one of the partitions is 0, just stop and do the nested loop on the other one
 		if(len(partL) == 0):
 			self.nestedLoop(partG)
-			return
 
 		if(len(partG) == 0):
 			self.nestedLoop(partL)
-			return
 
-		print("quickjoin, trece mai departe cu "+str(len(partL))+" "+str(len(partG)))
+		if(len(partL) == 0 or len(partG) == 0):
+			return
 
 		self.quickJoin(partL, constSmallNumber)
 		self.quickJoin(partG, constSmallNumber)
 
 	def quickJoinWin(self, objs1, objs2, constSmallNumber):
-		print("Intra in win")
+		#print("Intra in win")
 		totalLen = len(objs1) + len(objs2)
 		print("win len(objs), constSmallNumber "+str(totalLen)+" "+str(constSmallNumber))
 		if (totalLen == 0):
@@ -297,15 +319,16 @@ class quickDBSCAN:
 			if(len(objs1) == 1):
 				self.nestedLoop2(objs1, objs2)
 			self.nestedLoop(objs2)
-			print("quickjoinWIN, se opreste cu "+str(len(objs1))+" "+str(len(objs2)))
-			return
+			#print("quickjoinWIN, se opreste cu "+str(len(objs1))+" "+str(len(objs2)))
 
 		if(len(objs2) <= 1):
 			if(len(objs2) == 1):
 				self.nestedLoop2(objs1, objs2)
 			self.nestedLoop(objs1)
-			print("quickjoinWIN, se opreste cu "+str(len(objs1))+" "+str(len(objs2)))
-			return	
+			#print("quickjoinWIN, se opreste cu "+str(len(objs1))+" "+str(len(objs2)))
+			
+		if(len(objs1) <= 1 or len(objs2) <=1):
+			return
 
 		#print("win len objs1 " + str(len(objs1)))
 		#print("win len objs2 " + str(len(objs2)))
@@ -316,7 +339,7 @@ class quickDBSCAN:
 		#p1 = allObjects.max(axis=0)
 		p1 = self.centeroidnp(allObjects)
 
-		print("quickjoinWIN, trece mai departe cu "+str(len(objs1))+" "+str(len(objs2)))
+		#print("quickjoinWIN, trece mai departe cu "+str(len(objs1))+" "+str(len(objs2)))
 
 		(partL1, partG1, winL1, winG1) = self.partition(objs1, p1)
 		(partL2, partG2, winL2, winG2) = self.partition(objs2, p1)
@@ -324,11 +347,27 @@ class quickDBSCAN:
 		#print("quickjoinWIN, parturile intermediare "+str(len(partL1))+" "+str(len(partL2))+" "+str(len(partG1))+" "+str(len(partG2))+" "+str(len(winL1))+" "+str(len(winL2))+" "+str(len(winG1))+" "+str(len(winG2)))
 
 		#if any of the pairs contains a zero, switch to brute force
-		if (len(partL1) == 0 or len(partL2) == 0 or len(partG1) == 0 or len(partG2) == 0):
+		if (len(partL1) == 0 or len(partL2) == 0 or len(partG1) == 0 or len(partG2) == 0 or len(winL1) == 0 or len(winL2) == 0 or len(winG1) == 0 or len(winG2) == 0):
 			self.nestedLoop2(winL1, winG2)
 			self.nestedLoop2(winG1, winL2)
 			self.nestedLoop2(partL1, partL2)
 			self.nestedLoop2(partG1, partG2)
+			if(len(partL1) != 0):
+				self.nestedLoop(partL1)
+			if(len(partL2) != 0):
+				self.nestedLoop(partL2)
+			if(len(partG1) != 0):
+				self.nestedLoop(partG1)
+			if(len(partG2) != 0):
+				self.nestedLoop(partG2)
+			if(len(winL1) != 0):
+				self.nestedLoop(winL1)
+			if(len(winL2) != 0):
+				self.nestedLoop(winL2)
+			if(len(winG1) != 0):
+				self.nestedLoop(winG1)
+			if(len(winG2) != 0):
+				self.nestedLoop(winG2)
 			return
 
 		self.quickJoinWin(winL1, winG2, constSmallNumber)
@@ -342,6 +381,7 @@ class quickDBSCAN:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and  self.euclideanDistPosition(coord1, coord2) != 0):
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					self.allPairs.append([(coord1[0], coord1[1]), (coord2[0], coord2[1])])
 					#self.findAndMerge("quickDBSCAN", coord2)
 					#self.findAndMerge("quickDBSCAN", coord1)
 
@@ -352,6 +392,7 @@ class quickDBSCAN:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and self.euclideanDistPosition(coord1, coord2) != 0):
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					self.allPairs.append([(coord1[0], coord1[1]), (coord2[0], coord2[1])])
 					#self.findAndMerge("quickDBSCAN", coord2)
 					#self.findAndMerge("quickDBSCAN", coord1)					
 
@@ -393,7 +434,11 @@ class quickDBSCAN:
 			color = np.random.rand(3,)
 			for (x, y) in coordsInDocument:
 				plt.scatter(x, y, c=color)
+				#plt.text(x, y, str(x)+', '+str(y))
+		print("==================== ALL PAIRS ====================")
+		print(self.allPairs)
 		plt.show()
+		
 
 if __name__ == '__main__':
 
@@ -461,7 +506,7 @@ if __name__ == '__main__':
 
 	print('DBSCANKdtree took '+str(end - start))'''
 
-	quickDBSCAN = quickDBSCAN(4.5)
+	quickDBSCAN = quickDBSCAN(2)
 	quickDBSCAN.quickJoin(datasetQuick, 10)
 	quickDBSCAN.finalFindAndMerge(datasetQuick)
 	quickDBSCAN.plotClusters()
