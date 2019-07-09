@@ -13,6 +13,7 @@ import pprint
 from bson.objectid import ObjectId
 import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
+from copy import copy
 
 
 class DBSCAN:
@@ -123,8 +124,6 @@ class quickDBSCAN:
 		self.eps = eps
 		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB");
 
-		self.allPairs = []
-
 	def randomObject(self, objs):
 		randomIndex = randint(0, len(objs)-1)
 		return objs[randomIndex]
@@ -141,6 +140,9 @@ class quickDBSCAN:
 		else:
 			return False
 
+	def swapper(self, a, b):
+		return (copy(b), copy(a))
+
 	def ball_average(self, objs, p1):
 		#print("len(objs) "+str(len(objs)))
 		avgDistHelper = []
@@ -148,7 +150,7 @@ class quickDBSCAN:
 			if( (coord1-p1!= 0).any() ): #pixel != p1 in numpy arrays
 				avgDistHelper.append(self.euclideanDistPosition(coord1, p1))
 		avgDistHelper = np.array(avgDistHelper)
-		return round(sum(avgDistHelper)/len(avgDistHelper), 2)
+		return sum(avgDistHelper)/len(avgDistHelper)
 
 	def ball_median(self, objs, p1):
 		#print("len(objs) "+str(len(objs)))
@@ -194,9 +196,6 @@ class quickDBSCAN:
 		return maxDist/2
 
 	def partition(self, objs, p1):
-		#print("PARTITION len(objs) "+str(len(objs)))
-		partL = [] 
-		partG = []
 		winL = []
 		winG = []
 		
@@ -210,8 +209,8 @@ class quickDBSCAN:
 		print("new r is "+str(r))
 		startIdx = 0
 		endIdx = len(objs)-1
-		startDist = round(self.euclideanDistPosition(objs[startIdx], p1),2)
-		endDist = round(self.euclideanDistPosition(objs[endIdx], p1), 2)
+		startDist = self.euclideanDistPosition(objs[startIdx], p1)
+		endDist = self.euclideanDistPosition(objs[endIdx], p1)
 		
 		#enspe mii de helperi care tin copii ca sa ma asigur ca nu se apendeaza referinte
 		#pentru ca python :(
@@ -222,18 +221,18 @@ class quickDBSCAN:
 					helper1 = np.copy(objs[endIdx])
 					winG.append(helper1)
 				endIdx = endIdx - 1
-				endDist = round(self.euclideanDistPosition(objs[endIdx], p1),2)
+				endDist = self.euclideanDistPosition(objs[endIdx], p1)
 				
 			while(startDist <= r and startIdx < endIdx):
-				if(startDist >= round(r-self.eps,2)):
+				if(startDist >= r-self.eps):
 					helper2 = np.copy(objs[startIdx])
 					winL.append(helper2)
 				startIdx = startIdx + 1
-				startDist = round(self.euclideanDistPosition(objs[startIdx], p1),2)
+				startDist = self.euclideanDistPosition(objs[startIdx], p1)
 				
 			if(startIdx < endIdx):
 				print("Pentru "+str(objs[endIdx])+" endDist este "+str(endDist)+" iar r-eps este "+str(r-self.eps))
-				if(endDist >= round(r-self.eps,2)):
+				if(endDist >= r-self.eps):
 					print("Il apendeaza pe "+str(objs[endIdx]))
 					helper3 = np.copy(objs[endIdx])
 					winL.append(helper3)
@@ -241,17 +240,20 @@ class quickDBSCAN:
 					helper4 = np.copy(objs[startIdx])
 					winG.append(helper4)
 				#exchange items
+				print("Before swap start end "+str(objs[startIdx])+" "+str(objs[endIdx])+" "+str(startIdx)+" "+str(endIdx))
+				#objs[startIdx], objs[endIdx] = self.swapper(objs[endIdx], objs[startIdx])
 				objs[[startIdx, endIdx]] = objs[[endIdx, startIdx]]
+				print("After swap start end "+str(objs[startIdx])+" "+str(objs[endIdx])+" "+str(startIdx)+" "+str(endIdx))
 				startIdx = startIdx + 1
 				endIdx = endIdx - 1
-				startDist = round(self.euclideanDistPosition(objs[startIdx], p1),2)
-				endDist = round(self.euclideanDistPosition(objs[endIdx], p1),2)
+				startDist = self.euclideanDistPosition(objs[startIdx], p1)
+				endDist = self.euclideanDistPosition(objs[endIdx], p1)
 		
 		if(startIdx == endIdx):
 			if(endDist > r and endDist <= r+self.eps):
 				helper5 = np.copy(objs[endIdx])
 				winG.append(helper5)
-			if(startDist <= r and startDist >= round(r-self.eps,2)):
+			if(startDist <= r and startDist >= r-self.eps):
 				helper6 = np.copy(objs[startIdx])
 				winL.append(helper6)
 			if(endDist > r):
@@ -268,6 +270,14 @@ class quickDBSCAN:
 		print(winG)
 		print("========================= WIN G END ===================")
 
+		print("========================= OBJS first half ===================")
+		print(objs[0:endIdx])
+		print("========================= OBJS first half END ===================")
+
+		print("========================= OBJS last half ===================")
+		print(objs[endIdx:len(objs)])
+		print("========================= OBJS last half END ===================")
+
 
 
 		return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
@@ -283,11 +293,10 @@ class quickDBSCAN:
 
 		#p1 = self.randomObject(objs)
 		#p1 = objs.max(axis=0)
-		p1 = self.centeroidnp(objs)
+		p1 = self.furthestPivot(objs)
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
 		
-		#if(len(winL)>0 and len(winG)>0):
 		self.quickJoinWin(winL, winG, constSmallNumber)
 
 		#if one of the partitions is 0, just stop and do the nested loop on the other one
@@ -319,32 +328,23 @@ class quickDBSCAN:
 			if(len(objs1) == 1):
 				self.nestedLoop2(objs1, objs2)
 			self.nestedLoop(objs2)
-			#print("quickjoinWIN, se opreste cu "+str(len(objs1))+" "+str(len(objs2)))
 
 		if(len(objs2) <= 1):
 			if(len(objs2) == 1):
 				self.nestedLoop2(objs1, objs2)
 			self.nestedLoop(objs1)
-			#print("quickjoinWIN, se opreste cu "+str(len(objs1))+" "+str(len(objs2)))
 			
 		if(len(objs1) <= 1 or len(objs2) <=1):
 			return
-
-		#print("win len objs1 " + str(len(objs1)))
-		#print("win len objs2 " + str(len(objs2)))
 
 		allObjects = np.concatenate((objs1, objs2), axis=0)
 
 		#p1 = self.randomObject(allObjects)
 		#p1 = allObjects.max(axis=0)
-		p1 = self.centeroidnp(allObjects)
-
-		#print("quickjoinWIN, trece mai departe cu "+str(len(objs1))+" "+str(len(objs2)))
+		p1 = self.furthestPivot(allObjects)
 
 		(partL1, partG1, winL1, winG1) = self.partition(objs1, p1)
 		(partL2, partG2, winL2, winG2) = self.partition(objs2, p1)
-
-		#print("quickjoinWIN, parturile intermediare "+str(len(partL1))+" "+str(len(partL2))+" "+str(len(partG1))+" "+str(len(partG2))+" "+str(len(winL1))+" "+str(len(winL2))+" "+str(len(winG1))+" "+str(len(winG2)))
 
 		#if any of the pairs contains a zero, switch to brute force
 		if (len(partL1) == 0 or len(partL2) == 0 or len(partG1) == 0 or len(partG2) == 0 or len(winL1) == 0 or len(winL2) == 0 or len(winG1) == 0 or len(winG2) == 0):
@@ -381,9 +381,6 @@ class quickDBSCAN:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and  self.euclideanDistPosition(coord1, coord2) != 0):
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
-					self.allPairs.append([(coord1[0], coord1[1]), (coord2[0], coord2[1])])
-					#self.findAndMerge("quickDBSCAN", coord2)
-					#self.findAndMerge("quickDBSCAN", coord1)
 
 
 	def nestedLoop2(self, objs1, objs2):
@@ -392,10 +389,6 @@ class quickDBSCAN:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and self.euclideanDistPosition(coord1, coord2) != 0):
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
-					self.allPairs.append([(coord1[0], coord1[1]), (coord2[0], coord2[1])])
-					#self.findAndMerge("quickDBSCAN", coord2)
-					#self.findAndMerge("quickDBSCAN", coord1)					
-
 
 	def upsertPixelValue(self, collection, filter, epsNeigh):
 		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":{"$each":epsNeigh}}}, True, True)
@@ -428,13 +421,11 @@ class quickDBSCAN:
 		for document in cursor:
 			print(document)
 			coordsInDocument = list()
-			for (x, y) in document["bucket"]:
-				coordsInDocument.append((x,y))
-			coordsInDocument = set(coordsInDocument)
 			color = np.random.rand(3,)
-			for (x, y) in coordsInDocument:
-				plt.scatter(x, y, c=color)
-				#plt.text(x, y, str(x)+', '+str(y))
+			for pair in document["bucket"]:
+				plt.scatter(pair[0], pair[1], c=color)
+				#plt.text(pair[0], pair[1], str(pair[0])+', '+str(pair[1]))
+				
 		print("==================== ALL PAIRS ====================")
 		print(self.allPairs)
 		plt.show()
