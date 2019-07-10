@@ -13,7 +13,7 @@ import pprint
 from bson.objectid import ObjectId
 import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
-from copy import copy
+from copy import deepcopy
 
 
 class DBSCAN:
@@ -122,7 +122,8 @@ class quickDBSCAN:
 	def __init__(self, eps):
 		#int
 		self.eps = eps
-		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB");
+		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
+		self.allPairs = []
 
 	def randomObject(self, objs):
 		randomIndex = randint(0, len(objs)-1)
@@ -147,8 +148,9 @@ class quickDBSCAN:
 		#print("len(objs) "+str(len(objs)))
 		avgDistHelper = []
 		for coord1 in objs:
-			if( (coord1-p1!= 0).any() ): #pixel != p1 in numpy arrays
-				avgDistHelper.append(self.euclideanDistPosition(coord1, p1))
+			for coord2 in objs:
+				if( coord1 != coord2 ): #pixel != p1 in numpy arrays
+					avgDistHelper.append(self.euclideanDistPosition(coord1, coord2))
 		avgDistHelper = np.array(avgDistHelper)
 		return sum(avgDistHelper)/len(avgDistHelper)
 
@@ -156,7 +158,7 @@ class quickDBSCAN:
 		#print("len(objs) "+str(len(objs)))
 		avgDistHelper = []
 		for coord1 in objs:
-			if( (coord1-p1!= 0).any() ): #pixel != p1 in numpy arrays
+			if( coord1 != p1 ): #pixel != p1 in numpy arrays
 				avgDistHelper.append(self.euclideanDistPosition(coord1, p1))
 		avgDistHelper = np.array(avgDistHelper)
 		return np.median(avgDistHelper)
@@ -196,6 +198,8 @@ class quickDBSCAN:
 		return maxDist/2
 
 	def partition(self, objs, p1):
+		partL = []
+		partG = []
 		winL = []
 		winG = []
 		
@@ -205,7 +209,7 @@ class quickDBSCAN:
 		print("r is "+str(r))
 		#r must not be smaller than eps, it breaks things
 		if(r < self.eps):
-			r = r + 1.5*self.eps
+			r = r + 2*self.eps
 		print("new r is "+str(r))
 		startIdx = 0
 		endIdx = len(objs)-1
@@ -216,16 +220,26 @@ class quickDBSCAN:
 		#pentru ca python :(
 
 		while(startIdx < endIdx):
+			print("p1 = "+str(p1))
+			print("startIdx = "+str(startIdx)+" obj "+str(objs[startIdx]))
+			print("endIdx = "+str(endIdx)+" obj "+str(objs[endIdx]))
+			print("startDIST = "+str(startDist)+" obj "+str(objs[startIdx]))
+			print("endDIST = "+str(endDist)+" obj "+str(objs[endIdx]))
+
 			while(endDist > r and startIdx < endIdx):
+				print("PRIMUL WHILE endIdx = "+str(endIdx)+" obj "+str(objs[endIdx])+" endDist "+str(endDist))
 				if(endDist <= r+self.eps):
-					helper1 = np.copy(objs[endIdx])
+					print("endDist Il apendeaza pe "+str(objs[endIdx])+" endDist "+str(endDist))
+					helper1 = deepcopy(objs[endIdx])
 					winG.append(helper1)
 				endIdx = endIdx - 1
 				endDist = self.euclideanDistPosition(objs[endIdx], p1)
 				
 			while(startDist <= r and startIdx < endIdx):
+				print("AL DOILEA WHILE startIdx = "+str(startIdx)+" obj "+str(objs[startIdx])+" start "+str(startDist))
 				if(startDist >= r-self.eps):
-					helper2 = np.copy(objs[startIdx])
+					print("startDist Il apendeaza pe "+str(objs[startIdx])+" endDist "+str(startDist))
+					helper2 = deepcopy(objs[startIdx])
 					winL.append(helper2)
 				startIdx = startIdx + 1
 				startDist = self.euclideanDistPosition(objs[startIdx], p1)
@@ -233,16 +247,17 @@ class quickDBSCAN:
 			if(startIdx < endIdx):
 				print("Pentru "+str(objs[endIdx])+" endDist este "+str(endDist)+" iar r-eps este "+str(r-self.eps))
 				if(endDist >= r-self.eps):
-					print("Il apendeaza pe "+str(objs[endIdx]))
-					helper3 = np.copy(objs[endIdx])
+					print("endDist Il apendeaza pe "+str(objs[endIdx])+" endDist "+str(endDist))
+					helper3 = deepcopy(objs[endIdx])
 					winL.append(helper3)
 				if(startDist <= r+self.eps):
-					helper4 = np.copy(objs[startIdx])
+					print("startDist Il apendeaza pe "+str(objs[startIdx])+" startDist "+str(startDist))
+					helper4 = deepcopy(objs[startIdx])
 					winG.append(helper4)
 				#exchange items
 				print("Before swap start end "+str(objs[startIdx])+" "+str(objs[endIdx])+" "+str(startIdx)+" "+str(endIdx))
 				#objs[startIdx], objs[endIdx] = self.swapper(objs[endIdx], objs[startIdx])
-				objs[[startIdx, endIdx]] = objs[[endIdx, startIdx]]
+				objs[startIdx], objs[endIdx] = objs[endIdx], objs[startIdx]
 				print("After swap start end "+str(objs[startIdx])+" "+str(objs[endIdx])+" "+str(startIdx)+" "+str(endIdx))
 				startIdx = startIdx + 1
 				endIdx = endIdx - 1
@@ -250,17 +265,20 @@ class quickDBSCAN:
 				endDist = self.euclideanDistPosition(objs[endIdx], p1)
 		
 		if(startIdx == endIdx):
-			if(endDist > r and endDist <= r+self.eps):
-				helper5 = np.copy(objs[endIdx])
+			print("sunt egale "+str(startIdx)+" "+str(endIdx))
+			'''if(endDist > r and endDist <= r+self.eps):
+				helper5 = deepcopy(objs[endIdx])
 				winG.append(helper5)
 			if(startDist <= r and startDist >= r-self.eps):
-				helper6 = np.copy(objs[startIdx])
-				winL.append(helper6)
+				helper6 = deepcopy(objs[startIdx])
+				winL.append(helper6)'''
+			#border point should go in both partitions
+			helper5 = deepcopy(objs[endIdx])
+			winL.append(helper5)
+			winG.append(helper5)
+
 			if(endDist > r):
 				endIdx = endIdx - 1
-
-		winL = np.array(winL)
-		winG = np.array(winG)
 
 		print("========================= WIN L ===================")
 		print(winL)
@@ -278,9 +296,15 @@ class quickDBSCAN:
 		print(objs[endIdx:len(objs)])
 		print("========================= OBJS last half END ===================")
 
+		#create partL and partG relative to the distance from p1
+		for obj in objs:
+			if(self.euclideanDistPosition(obj, p1) < r):
+				partL.append(obj)
+			else:
+				partG.append(obj)
 
-
-		return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
+		#return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
+		return (partL, partG, winL, winG)
 
 	def quickJoin(self, objs, constSmallNumber):
 		print("quick len(objs), constSmallNumber "+str(len(objs))+" "+str(constSmallNumber))
@@ -291,9 +315,9 @@ class quickDBSCAN:
 			self.nestedLoop(objs)
 			return
 
-		#p1 = self.randomObject(objs)
+		p1 = self.randomObject(objs)
 		#p1 = objs.max(axis=0)
-		p1 = self.furthestPivot(objs)
+		#p1 = self.centeroidnp(objs)
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
 		
@@ -327,21 +351,19 @@ class quickDBSCAN:
 		if(len(objs1) <= 1):
 			if(len(objs1) == 1):
 				self.nestedLoop2(objs1, objs2)
-			self.nestedLoop(objs2)
 
 		if(len(objs2) <= 1):
 			if(len(objs2) == 1):
 				self.nestedLoop2(objs1, objs2)
-			self.nestedLoop(objs1)
 			
 		if(len(objs1) <= 1 or len(objs2) <=1):
 			return
 
-		allObjects = np.concatenate((objs1, objs2), axis=0)
+		allObjects = objs1 + objs2
 
-		#p1 = self.randomObject(allObjects)
+		p1 = self.randomObject(allObjects)
 		#p1 = allObjects.max(axis=0)
-		p1 = self.furthestPivot(allObjects)
+		#p1 = self.centeroidnp(allObjects)
 
 		(partL1, partG1, winL1, winG1) = self.partition(objs1, p1)
 		(partL2, partG2, winL2, winG2) = self.partition(objs2, p1)
@@ -352,22 +374,6 @@ class quickDBSCAN:
 			self.nestedLoop2(winG1, winL2)
 			self.nestedLoop2(partL1, partL2)
 			self.nestedLoop2(partG1, partG2)
-			if(len(partL1) != 0):
-				self.nestedLoop(partL1)
-			if(len(partL2) != 0):
-				self.nestedLoop(partL2)
-			if(len(partG1) != 0):
-				self.nestedLoop(partG1)
-			if(len(partG2) != 0):
-				self.nestedLoop(partG2)
-			if(len(winL1) != 0):
-				self.nestedLoop(winL1)
-			if(len(winL2) != 0):
-				self.nestedLoop(winL2)
-			if(len(winG1) != 0):
-				self.nestedLoop(winG1)
-			if(len(winG2) != 0):
-				self.nestedLoop(winG2)
 			return
 
 		self.quickJoinWin(winL1, winG2, constSmallNumber)
@@ -378,17 +384,18 @@ class quickDBSCAN:
 	def nestedLoop(self, objs):
 		for coord1 in objs:
 			for coord2 in objs:
-				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and  self.euclideanDistPosition(coord1, coord2) != 0):
+				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and  coord1 != coord2):
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
-
+					self.allPairs.append([[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 
 	def nestedLoop2(self, objs1, objs2):
 		for coord1 in objs1:
 			for coord2 in objs2:
-				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and self.euclideanDistPosition(coord1, coord2) != 0):
+				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and coord1 != coord2):
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+					self.allPairs.append([[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 
 	def upsertPixelValue(self, collection, filter, epsNeigh):
 		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":{"$each":epsNeigh}}}, True, True)
@@ -447,7 +454,9 @@ if __name__ == '__main__':
 			datasetQuick.append( (float(row[0]), float(row[1])) )
 
 	dataset = np.array(dataset)
-	datasetQuick = np.array(datasetQuick)
+	datasetQuick = datasetQuick
+
+	#datasetQuick = datasetQuick[0:100]
 
 	print(np.shape(dataset))
 
