@@ -356,6 +356,8 @@ class quickDBSCAN:
 		return (partL, partG, winL, winG)
 
 	def quickJoin(self, objs, constSmallNumber):
+		objs = list(set(objs))
+
 		print("quick len(objs), constSmallNumber "+str(len(objs))+" "+str(constSmallNumber))
 		if(len(objs) == 0):
 			return
@@ -386,6 +388,8 @@ class quickDBSCAN:
 		self.quickJoin(partG, constSmallNumber)
 
 	def quickJoinWin(self, objs1, objs2, constSmallNumber):
+		objs1 = list(set(objs1))
+		objs2 = list(set(objs2))
 		print("Intra in win")
 
 		if (len(objs1) == 0 or len(objs2) == 0):
@@ -548,7 +552,7 @@ if __name__ == '__main__':
 
 	dbscan.plotClusters()'''
 
-	quickDBSCAN = quickDBSCAN(2.5)
+	quickDBSCAN = quickDBSCAN(2.8)
 	quickDBSCAN.quickJoin(datasetQuick, 10)
 	quickDBSCAN.finalFindAndMerge(datasetQuick)
 	quickDBSCAN.plotClusters()
