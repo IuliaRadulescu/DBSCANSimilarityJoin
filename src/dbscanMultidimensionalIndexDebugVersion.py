@@ -180,6 +180,7 @@ class quickDBSCAN:
 		#int
 		self.eps = eps
 		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
+		self.allPairs = []
 
 	def randomObject(self, objs):
 		randomIndex = randint(0, len(objs)-1)
@@ -258,44 +259,66 @@ class quickDBSCAN:
 		winL = []
 		winG = []
 		
+		print("p1 = "+str(p1)+" len objs = "+ str(len(objs)))
+
 		r = round(self.ball_average(objs, p1), 2)
-	
+		print("r is "+str(r))
+		#r must not be smaller than eps, it breaks things
+		'''if(r < self.eps):
+			r = r + 2*self.eps'''
+		print("new r is "+str(r))
 		startIdx = 0
 		endIdx = len(objs)-1
 		startDist = self.euclideanDistPosition(objs[startIdx], p1)
 		endDist = self.euclideanDistPosition(objs[endIdx], p1)
 
 		while(startIdx < endIdx):
-		
+			print("p1 = "+str(p1))
+			print("startIdx = "+str(startIdx)+" obj "+str(objs[startIdx]))
+			print("endIdx = "+str(endIdx)+" obj "+str(objs[endIdx]))
+			print("startDIST = "+str(startDist)+" obj "+str(objs[startIdx]))
+			print("endDIST = "+str(endDist)+" obj "+str(objs[endIdx]))
+
 			while(endDist > r and startIdx < endIdx):
+				print("PRIMUL WHILE endIdx = "+str(endIdx)+" obj "+str(objs[endIdx])+" endDist "+str(endDist))
 				if(endDist <= r+self.eps):
+					print("endDist Il apendeaza pe "+str(objs[endIdx])+" endDist "+str(endDist))
 					helper1 = deepcopy(objs[endIdx])
 					winG.append(helper1)
 				endIdx = endIdx - 1
 				endDist = self.euclideanDistPosition(objs[endIdx], p1)
 				
 			while(startDist <= r and startIdx < endIdx):
+				print("AL DOILEA WHILE startIdx = "+str(startIdx)+" obj "+str(objs[startIdx])+" start "+str(startDist))
 				if(startDist >= r-self.eps):
+					print("startDist Il apendeaza pe "+str(objs[startIdx])+" endDist "+str(startDist))
 					helper2 = deepcopy(objs[startIdx])
 					winL.append(helper2)
 				startIdx = startIdx + 1
 				startDist = self.euclideanDistPosition(objs[startIdx], p1)
 				
 			if(startIdx < endIdx):
+				print("Pentru "+str(objs[endIdx])+" endDist este "+str(endDist)+" iar r-eps este "+str(r-self.eps))
 				if(endDist >= r-self.eps):
+					print("endDist Il apendeaza pe "+str(objs[endIdx])+" endDist "+str(endDist))
 					helper3 = deepcopy(objs[endIdx])
 					winL.append(helper3)
 				if(startDist <= r+self.eps):
+					print("startDist Il apendeaza pe "+str(objs[startIdx])+" startDist "+str(startDist))
 					helper4 = deepcopy(objs[startIdx])
 					winG.append(helper4)
 				#exchange items
+				print("Before swap start end "+str(objs[startIdx])+" "+str(objs[endIdx])+" "+str(startIdx)+" "+str(endIdx))
+				#objs[startIdx], objs[endIdx] = self.swapper(objs[endIdx], objs[startIdx])
 				objs[startIdx], objs[endIdx] = objs[endIdx], objs[startIdx]
+				print("After swap start end "+str(objs[startIdx])+" "+str(objs[endIdx])+" "+str(startIdx)+" "+str(endIdx))
 				startIdx = startIdx + 1
 				endIdx = endIdx - 1
 				startDist = self.euclideanDistPosition(objs[startIdx], p1)
 				endDist = self.euclideanDistPosition(objs[endIdx], p1)
 		
 		if(startIdx == endIdx):
+			print("sunt egale "+str(startIdx)+" "+str(endIdx))
 			if(endDist > r and endDist <= r+self.eps):
 				helper5 = deepcopy(objs[endIdx])
 				winG.append(helper5)
@@ -306,24 +329,45 @@ class quickDBSCAN:
 			if(endDist > r):
 				endIdx = endIdx - 1
 
+		print("========================= WIN L ===================")
+		print(winL)
+		print("========================= WIN L END ===================")
+
+		print("========================= WIN G ===================")
+		print(winG)
+		print("========================= WIN G END ===================")
+
+		print("========================= OBJS first half ===================")
+		print(objs[0:endIdx])
+		print("========================= OBJS first half END ===================")
+
+		print("========================= OBJS last half ===================")
+		print(objs[endIdx:len(objs)])
+		print("========================= OBJS last half END ===================")
+
 		#create partL and partG relative to the distance from p1
 		for obj in objs:
 			if(self.euclideanDistPosition(obj, p1) < r):
 				partL.append(obj)
 			else:
 				partG.append(obj)
+
+		#return (objs[0:endIdx], objs[endIdx:len(objs)], winL, winG)
 		return (partL, partG, winL, winG)
 
 	def quickJoin(self, objs, constSmallNumber):
 		objs = list(set(objs))
 
+		print("quick len(objs), constSmallNumber "+str(len(objs))+" "+str(constSmallNumber))
 		if(len(objs) == 0):
 			return
 		if(len(objs) < constSmallNumber):
+			#print("GATA! len(objs) "+str(len(objs)))
 			self.nestedLoop(objs)
 			return
 
 		p1 = self.randomObject(objs)
+		#p1 = objs.max(axis=0)
 		#p1 = self.centeroidnp(objs)
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
@@ -349,21 +393,26 @@ class quickDBSCAN:
 		print("Intra in win")
 
 		if (len(objs1) == 0 or len(objs2) == 0):
+			print("Una dintre partitii e 0, n-am de ce sa continui")
 			return
 
 		if (len(objs1) == 1 or len(objs2) == 1):
+			print("Una dintre partitii e 1, n-am de ce sa continui")
 			self.nestedLoop2(objs1, objs2)
 			return
 
 		totalLen = len(objs1) + len(objs2)
-	
+		print("win len(objs), len(objs1), len(objs2), constSmallNumber "+str(totalLen)+" | "+str(objs1)+" | "+str(objs2)+" | "+str(constSmallNumber))
+
 		if(totalLen < constSmallNumber):
+			#print("GATA Win! len(objs) "+str(totalLen))
 			self.nestedLoop2(objs1, objs2, ["objs1", "objs2"])
 			return
 
 		allObjects = objs1 + objs2
 
 		p1 = self.randomObject(allObjects)
+		#p1 = allObjects.max(axis=0)
 		#p1 = self.centeroidnp(allObjects)
 
 		(partL1, partG1, winL1, winG1) = self.partition(objs1, p1)
@@ -388,14 +437,19 @@ class quickDBSCAN:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and  coord1 != coord2):
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
-					
+					self.allPairs.append([[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+
 	def nestedLoop2(self, objs1, objs2, deUndeVine = []):
+		if(len(deUndeVine) != 0):
+			print("nested loop vine din ")
+		print("nested loop objs1, objs2 "+ str(objs1) + str(objs2))
 		for coord1 in objs1:
 			for coord2 in objs2:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and coord1 != coord2):
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord1[0], coord1[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
-					
+					self.allPairs.append([[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
+
 	def upsertPixelValue(self, collection, filter, epsNeigh):
 		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":{"$each":epsNeigh}}}, True, True)
 
@@ -407,13 +461,18 @@ class quickDBSCAN:
 		aggregationResult = self.mongoConnectInstance.aggregate(collection, aggregationString)
 		aggregationResultList = list(aggregationResult)
 		
+		print("Aggregation")
+		#remove all other documents - we aggregated them
+		print("Count before remove: "+str(self.mongoConnectInstance.count(collection, {})))
 		self.mongoConnectInstance.remove(collection, {"bucket": [coord[0], coord[1]] })
-
+		print("Count after remove: "+str(self.mongoConnectInstance.count(collection, {})))
 		#insert the aggregated document
 		for document in aggregationResultList:
+			print("Document")
 			self.mongoConnectInstance.insert(collection, document)
 
 	def finalFindAndMerge(self, objs):
+		print("In final findAndMerge "+str(len(objs)))
 		for obj in objs:
 			self.findAndMerge("quickDBSCAN", obj)
 
@@ -427,6 +486,8 @@ class quickDBSCAN:
 				plt.scatter(pair[0], pair[1], c=color)
 				#plt.text(pair[0], pair[1], str(pair[0])+', '+str(pair[1]))
 				
+		print("==================== ALL PAIRS ====================")
+		print(self.allPairs)
 		plt.show()
 		
 
