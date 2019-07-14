@@ -118,6 +118,63 @@ class DBSCANKDtree(DBSCAN):
 			result.append(self.dataset[neighId])
 		return np.array(result)
 
+class DBSCANKDtreeSimilarityJoin:
+	def __init__(self, eps, dataset):
+		self.eps = eps
+		self.dataset = dataset
+
+	def buildIndex(self):
+		datasetForIndex = np.delete(self.dataset, 2, 1) #eliminate the third dimension which is the cluster id
+		self.kdIndex = spatial.KDTree(datasetForIndex, leafsize=1000)
+
+	def createEpsChains(self):
+		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
+		results = self.kdIndex.query_ball_tree(self.kdIndex, self.eps)
+		for idx in range(len(self.dataset)):
+			for result in self.dataset[results[idx]]:
+				self.upsertPixelValue('kdTreeDBSCAN', {"$or":[ {"bucket":[]},{"bucket": [result[0], result[1]] }] }, [[result[0], result[1]], [self.dataset[idx][0], self.dataset[idx][1]]], False)
+				self.upsertPixelValue('kdTreeDBSCAN', {"$or":[ {"bucket":[]},{"bucket": [self.dataset[idx][0], self.dataset[idx][1]] }] }, [[result[0], result[1]], [self.dataset[idx][0], self.dataset[idx][1]]])
+	
+	def finalFindAndMerge(self):
+		for obj in self.dataset:
+			self.findAndMerge('kdTreeDBSCAN', obj)
+
+	def plotClusters(self):
+		cursor = self.mongoConnectInstance.getRecords("kdTreeDBSCAN", {}, {"bucket"})
+		for document in cursor:
+			print(document)
+			coordsInDocument = list()
+			color = np.random.rand(3,)
+			for pair in document["bucket"]:
+				plt.scatter(pair[0], pair[1], c=color)
+				#plt.text(pair[0], pair[1], str(pair[0])+', '+str(pair[1]))
+		plt.show()
+	
+	def upsertPixelValue(self, collection, filter, epsNeigh, upsert = True):
+		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":{"$each":epsNeigh}}}, upsert, True)
+
+	def findAndMerge(self, collection, coord):
+		#aggregate the results
+		if(self.mongoConnectInstance.count(collection, {"bucket": [coord[0], coord[1]] } ) <= 1):
+			return
+		aggregationString=[{"$match": {"bucket": [coord[0], coord[1]] } },{"$unwind": "$bucket"},{"$group" : {"_id" : ObjectId(), "bucket":{"$addToSet":"$bucket"}}}]
+		aggregationResult = self.mongoConnectInstance.aggregate(collection, aggregationString)
+		aggregationResultList = list(aggregationResult)
+		
+		print("Aggregation")
+		#remove all other documents - we aggregated them
+		print("Count before remove: "+str(self.mongoConnectInstance.count(collection, {})))
+		self.mongoConnectInstance.remove(collection, {"bucket": [coord[0], coord[1]] })
+		print("Count after remove: "+str(self.mongoConnectInstance.count(collection, {})))
+		#insert the aggregated document
+		for document in aggregationResultList:
+			print("Document")
+			self.mongoConnectInstance.insert(collection, document)
+
+	def doDbscan(self):
+		self.createEpsChains()
+		self.finalFindAndMerge()
+
 class quickDBSCAN:
 	def __init__(self, eps):
 		#int
@@ -266,16 +323,16 @@ class quickDBSCAN:
 		
 		if(startIdx == endIdx):
 			print("sunt egale "+str(startIdx)+" "+str(endIdx))
-			'''if(endDist > r and endDist <= r+self.eps):
+			if(endDist > r and endDist <= r+self.eps):
 				helper5 = deepcopy(objs[endIdx])
 				winG.append(helper5)
 			if(startDist <= r and startDist >= r-self.eps):
 				helper6 = deepcopy(objs[startIdx])
-				winL.append(helper6)'''
+				winL.append(helper6)
 			#border point should go in both partitions
-			helper5 = deepcopy(objs[endIdx])
+			'''helper5 = deepcopy(objs[endIdx])
 			winL.append(helper5)
-			winG.append(helper5)
+			winG.append(helper5)'''
 
 			if(endDist > r):
 				endIdx = endIdx - 1
@@ -478,17 +535,8 @@ if __name__ == '__main__':
 
 	print('DBSCANRtree took '+str(end - start))'''
 
-	'''dbscan = DBSCAN(1, 5, dataset)
 
-	start = time.time()
-
-	dbscan.doDbscan()
-
-	end = time.time()
-
-	print('DBSCAN took '+str(end - start))
-
-	dbscan = DBSCANKDtree(1, 5, dataset)
+	dbscan = DBSCANKDtreeSimilarityJoin(2.53, dataset)
 
 	start = time.time()
 
@@ -504,12 +552,14 @@ if __name__ == '__main__':
 
 	end = time.time()
 
-	print('DBSCANKdtree took '+str(end - start))'''
+	print('DBSCANKdtree took '+str(end - start))
 
-	quickDBSCAN = quickDBSCAN(2)
+	dbscan.plotClusters()
+
+	'''quickDBSCAN = quickDBSCAN(2.8)
 	quickDBSCAN.quickJoin(datasetQuick, 10)
 	quickDBSCAN.finalFindAndMerge(datasetQuick)
-	quickDBSCAN.plotClusters()
+	quickDBSCAN.plotClusters()'''
 
 
 
