@@ -202,7 +202,6 @@ class quickDBSCAN:
 		return (copy(b), copy(a))
 
 	def ball_average(self, objs, p1):
-		#print("len(objs) "+str(len(objs)))
 		avgDistHelper = []
 		for coord1 in objs:
 			for coord2 in objs:
@@ -265,16 +264,13 @@ class quickDBSCAN:
 		r = round(self.ball_average(objs, p1), 2)
 		print("r is "+str(r))
 		#r must not be smaller than eps, it breaks things
-		if(r < self.eps):
-			r = r + 2*self.eps
+		'''if(r < self.eps):
+			r = r + 2*self.eps'''
 		print("new r is "+str(r))
 		startIdx = 0
 		endIdx = len(objs)-1
 		startDist = self.euclideanDistPosition(objs[startIdx], p1)
 		endDist = self.euclideanDistPosition(objs[endIdx], p1)
-		
-		#enspe mii de helperi care tin copii ca sa ma asigur ca nu se apendeaza referinte
-		#pentru ca python :(
 
 		while(startIdx < endIdx):
 			print("p1 = "+str(p1))
@@ -329,10 +325,6 @@ class quickDBSCAN:
 			if(startDist <= r and startDist >= r-self.eps):
 				helper6 = deepcopy(objs[startIdx])
 				winL.append(helper6)
-			#border point should go in both partitions
-			'''helper5 = deepcopy(objs[endIdx])
-			winL.append(helper5)
-			winG.append(helper5)'''
 
 			if(endDist > r):
 				endIdx = endIdx - 1
@@ -394,26 +386,23 @@ class quickDBSCAN:
 		self.quickJoin(partG, constSmallNumber)
 
 	def quickJoinWin(self, objs1, objs2, constSmallNumber):
-		#print("Intra in win")
-		totalLen = len(objs1) + len(objs2)
-		print("win len(objs), constSmallNumber "+str(totalLen)+" "+str(constSmallNumber))
-		if (totalLen == 0):
+		print("Intra in win")
+
+		if (len(objs1) == 0 or len(objs2) == 0):
+			print("Una dintre partitii e 0, n-am de ce sa continui")
 			return
 
-		if(totalLen < constSmallNumber):
-			#print("GATA Win! len(objs) "+str(totalLen))
+		if (len(objs1) == 1 or len(objs2) == 1):
+			print("Una dintre partitii e 1, n-am de ce sa continui")
 			self.nestedLoop2(objs1, objs2)
 			return
 
-		if(len(objs1) <= 1):
-			if(len(objs1) == 1):
-				self.nestedLoop2(objs1, objs2)
+		totalLen = len(objs1) + len(objs2)
+		print("win len(objs), len(objs1), len(objs2), constSmallNumber "+str(totalLen)+" | "+str(objs1)+" | "+str(objs2)+" | "+str(constSmallNumber))
 
-		if(len(objs2) <= 1):
-			if(len(objs2) == 1):
-				self.nestedLoop2(objs1, objs2)
-			
-		if(len(objs1) <= 1 or len(objs2) <=1):
+		if(totalLen < constSmallNumber):
+			#print("GATA Win! len(objs) "+str(totalLen))
+			self.nestedLoop2(objs1, objs2, ["objs1", "objs2"])
 			return
 
 		allObjects = objs1 + objs2
@@ -427,10 +416,10 @@ class quickDBSCAN:
 
 		#if any of the pairs contains a zero, switch to brute force
 		if (len(partL1) == 0 or len(partL2) == 0 or len(partG1) == 0 or len(partG2) == 0 or len(winL1) == 0 or len(winL2) == 0 or len(winG1) == 0 or len(winG2) == 0):
-			self.nestedLoop2(winL1, winG2)
-			self.nestedLoop2(winG1, winL2)
-			self.nestedLoop2(partL1, partL2)
-			self.nestedLoop2(partG1, partG2)
+			self.nestedLoop2(winL1, winG2, ["winL1", "winG2"])
+			self.nestedLoop2(winG1, winL2, ["winG1", "winL2"])
+			self.nestedLoop2(partL1, partL2, ["partL1", "winL2"])
+			self.nestedLoop2(partG1, partG2, ["partG11", "winG2"])
 			return
 
 		self.quickJoinWin(winL1, winG2, constSmallNumber)
@@ -446,7 +435,10 @@ class quickDBSCAN:
 					self.upsertPixelValue("quickDBSCAN",{"$or":[ {"bucket":[]},{"bucket": [coord2[0], coord2[1]] }] }, [[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 					self.allPairs.append([[coord1[0], coord1[1]], [coord2[0], coord2[1]]])
 
-	def nestedLoop2(self, objs1, objs2):
+	def nestedLoop2(self, objs1, objs2, deUndeVine = []):
+		if(len(deUndeVine) != 0):
+			print("nested loop vine din ")
+		print("nested loop objs1, objs2 "+ str(objs1) + str(objs2))
 		for coord1 in objs1:
 			for coord2 in objs2:
 				if( self.euclideanDistPosition(coord1, coord2) <= self.eps and coord1 != coord2):
@@ -511,7 +503,7 @@ if __name__ == '__main__':
 			datasetQuick.append( (float(row[0]), float(row[1])) )
 
 	dataset = np.array(dataset)
-	datasetQuick = datasetQuick
+	#datasetQuick = datasetQuick[0:200]
 
 	#datasetQuick = datasetQuick[0:100]
 
@@ -536,7 +528,7 @@ if __name__ == '__main__':
 	print('DBSCANRtree took '+str(end - start))'''
 
 
-	dbscan = DBSCANKDtreeSimilarityJoin(2.53, dataset)
+	'''dbscan = DBSCANKDtreeSimilarityJoin(2.53, dataset)
 
 	start = time.time()
 
@@ -554,12 +546,12 @@ if __name__ == '__main__':
 
 	print('DBSCANKdtree took '+str(end - start))
 
-	dbscan.plotClusters()
+	dbscan.plotClusters()'''
 
-	'''quickDBSCAN = quickDBSCAN(2.8)
+	quickDBSCAN = quickDBSCAN(2.5)
 	quickDBSCAN.quickJoin(datasetQuick, 10)
 	quickDBSCAN.finalFindAndMerge(datasetQuick)
-	quickDBSCAN.plotClusters()'''
+	quickDBSCAN.plotClusters()
 
 
 
