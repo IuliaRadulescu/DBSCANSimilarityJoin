@@ -41,10 +41,8 @@ class DBSCAN:
 				if self.expandCluster(obj, clusterId):
 					clusterId = clusterId + 1
 
-
 	def distEuclid(self, a, b):
 		return np.linalg.norm(a-b)
-
 
 	def regionQuery(self, obj):
 		result = []
@@ -53,8 +51,6 @@ class DBSCAN:
 				result.append(obj2)
 		return np.array(result)
 
-
-	
 	def expandCluster(self, obj, clusterId):
 
 		neighs = self.regionQuery(obj)
@@ -122,13 +118,15 @@ class DBSCANKDtreeSimilarityJoin:
 	def __init__(self, eps, dataset):
 		self.eps = eps
 		self.dataset = dataset
+		#clean collection
+		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
+		self.mongoConnectInstance.remove("kdTreeDBSCAN", {})
 
 	def buildIndex(self):
 		datasetForIndex = np.delete(self.dataset, 2, 1) #eliminate the third dimension which is the cluster id
 		self.kdIndex = spatial.KDTree(datasetForIndex, leafsize=1000)
 
 	def createEpsChains(self):
-		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
 		results = self.kdIndex.query_ball_tree(self.kdIndex, self.eps)
 		for idx in range(len(self.dataset)):
 			for result in self.dataset[results[idx]]:
@@ -160,15 +158,11 @@ class DBSCANKDtreeSimilarityJoin:
 		aggregationString=[{"$match": {"bucket": [coord[0], coord[1]] } },{"$unwind": "$bucket"},{"$group" : {"_id" : ObjectId(), "bucket":{"$addToSet":"$bucket"}}}]
 		aggregationResult = self.mongoConnectInstance.aggregate(collection, aggregationString)
 		aggregationResultList = list(aggregationResult)
-		
-		print("Aggregation")
+
 		#remove all other documents - we aggregated them
-		print("Count before remove: "+str(self.mongoConnectInstance.count(collection, {})))
 		self.mongoConnectInstance.remove(collection, {"bucket": [coord[0], coord[1]] })
-		print("Count after remove: "+str(self.mongoConnectInstance.count(collection, {})))
 		#insert the aggregated document
 		for document in aggregationResultList:
-			print("Document")
 			self.mongoConnectInstance.insert(collection, document)
 
 	def doDbscan(self):
@@ -180,6 +174,8 @@ class quickDBSCAN:
 		#int
 		self.eps = eps
 		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
+		#clean collection
+		self.mongoConnectInstance.remove("quickDBSCAN", {})
 
 	def randomObject(self, objs):
 		randomIndex = randint(0, len(objs)-1)
@@ -419,7 +415,6 @@ class quickDBSCAN:
 	def plotClusters(self):
 		cursor = self.mongoConnectInstance.getRecords("quickDBSCAN", {}, {"bucket"})
 		for document in cursor:
-			print(document)
 			coordsInDocument = list()
 			color = np.random.rand(3,)
 			for pair in document["bucket"]:
@@ -427,14 +422,9 @@ class quickDBSCAN:
 				#plt.text(pair[0], pair[1], str(pair[0])+', '+str(pair[1]))
 				
 		plt.show()
-		
 
-if __name__ == '__main__':
 
-	sys.setrecursionlimit(15000)
-
-	#read the csv
-	datasetFilename = sys.argv[1]
+def createDataset(datasetFilename):
 	dataset = list()
 	datasetQuick = list()
 
@@ -445,11 +435,15 @@ if __name__ == '__main__':
 			datasetQuick.append( ( round(float(row[0]), 3), round(float(row[1]), 3) ) )
 
 	dataset = np.array( list( set (dataset) ))
-	#datasetQuick = datasetQuick[0:200]
 
-	#datasetQuick = datasetQuick[0:100]
+	return (dataset, datasetQuick)
 
-	print(np.shape(dataset))
+if __name__ == '__main__':
+
+	sys.setrecursionlimit(15000)
+
+	#read the csv
+	#datasetFilename = sys.argv[1]
 
 	'''dbscan = DBSCANRtree(1, 5, dataset)
 
@@ -469,31 +463,60 @@ if __name__ == '__main__':
 
 	print('DBSCANRtree took '+str(end - start))'''
 
+	datasetFiles = ["dataset/noisy_circles_300.csv", "dataset/noisy_moons_300.csv", "dataset/blobs_600.csv", "dataset/noisy_circles_600.csv", "dataset/noisy_moons_600.csv", "dataset/blobs_600.csv", "dataset/noisy_circles_1000.csv", "dataset/noisy_moons_1000.csv", "dataset/blobs_1000.csv"]
 
-	'''dbscan = DBSCANKDtreeSimilarityJoin(2.53, dataset)
+	lower = 0.0
+	upper = 1.1
+	length = 10
+	epsValues = [lower + x*(upper-lower)/length for x in range(length)]
+	epsValues.append(1)
 
-	start = time.time()
+	for datasetFile in datasetFiles:
+		simpleDBSCANTimes = list()
+		kdTreeIdxCreationTimes = list()
+		kdTreeDBSCANTimes = list()
+		quickDBSCANTimes = list()
+		print('FILE '+str(datasetFile)+'=====================\n')
+		print('\n\n')
+		for eps in epsValues:
+			(dataset, datasetQuick) = createDataset(datasetFile)
 
-	dbscan.buildIndex()
+			simpleDBSCAN = DBSCAN(eps, 5, dataset)
+			start = time.time()
+			simpleDBSCAN.doDbscan()
+			end = time.time()
+			simpleDBSCANTimes.append((end - start))
 
-	end = time.time()
+			dbscan = DBSCANKDtreeSimilarityJoin(eps, dataset)
+			start = time.time()
+			dbscan.buildIndex()
+			end = time.time()
+			kdTreeIdxCreationTimes.append((end - start))
 
-	print('DBSCANKdtree buildIndex took '+str(end - start))
+			start = time.time()
+			dbscan.doDbscan()
+			end = time.time()
+			kdTreeDBSCANTimes.append((end - start))
 
-	start = time.time()
+			quickDBSCANInstance = quickDBSCAN(eps)
 
-	dbscan.doDbscan()
+			start = time.time()
+			quickDBSCANInstance.quickJoin(datasetQuick, 10)
+			quickDBSCANInstance.finalFindAndMerge(datasetQuick)
 
-	end = time.time()
+			end = time.time()
+			quickDBSCANTimes.append((end - start))
 
-	print('DBSCANKdtree took '+str(end - start))
+		print('\n')
+		print('simpleDBSCANTimes times for all eps '+str(simpleDBSCANTimes)+'\n')
 
-	dbscan.plotClusters()'''
+		print('Index creation times for all eps '+str(kdTreeIdxCreationTimes)+'\n')
+		print('\n')
 
-	quickDBSCAN = quickDBSCAN(0.25)
-	quickDBSCAN.quickJoin(datasetQuick, 10)
-	quickDBSCAN.finalFindAndMerge(datasetQuick)
-	quickDBSCAN.plotClusters()
+		print('kdTree times for all eps '+str(kdTreeIdxCreationTimes)+'\n')
+		print('\n')
+
+		print('quickDBSCAN times for all eps '+str(quickDBSCANTimes)+'\n')
 
 
 
