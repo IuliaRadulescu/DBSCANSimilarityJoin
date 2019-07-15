@@ -471,13 +471,15 @@ if __name__ == '__main__':
 	epsValues = [lower + x*(upper-lower)/length for x in range(length)]
 	epsValues.append(1)
 
+	f = open("quickDBSCANPerformance.txt","a+")
+
 	for datasetFile in datasetFiles:
 		simpleDBSCANTimes = list()
 		kdTreeIdxCreationTimes = list()
 		kdTreeDBSCANTimes = list()
 		quickDBSCANTimes = list()
-		print('FILE '+str(datasetFile)+'=====================\n')
-		print('\n\n')
+		f.write('FILE '+str(datasetFile)+'=====================\n')
+		f.write('\n\n')
 		for eps in epsValues:
 			(dataset, datasetQuick) = createDataset(datasetFile)
 
@@ -507,16 +509,18 @@ if __name__ == '__main__':
 			end = time.time()
 			quickDBSCANTimes.append((end - start))
 
-		print('\n')
-		print('simpleDBSCANTimes times for all eps '+str(simpleDBSCANTimes)+'\n')
+		f.write('\n')
+		f.write('simpleDBSCANTimes times for all eps '+str(simpleDBSCANTimes)+'\n')
 
-		print('Index creation times for all eps '+str(kdTreeIdxCreationTimes)+'\n')
-		print('\n')
+		f.write('Index creation times for all eps '+str(kdTreeIdxCreationTimes)+'\n')
+		f.write('\n')
 
-		print('kdTree times for all eps '+str(kdTreeIdxCreationTimes)+'\n')
-		print('\n')
+		f.write('kdTree times for all eps '+str(kdTreeIdxCreationTimes)+'\n')
+		f.write('\n')
 
-		print('quickDBSCAN times for all eps '+str(quickDBSCANTimes)+'\n')
+		f.write('quickDBSCAN times for all eps '+str(quickDBSCANTimes)+'\n')
+		
+	f.close()
 
 
 
