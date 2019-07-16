@@ -465,25 +465,20 @@ if __name__ == '__main__':
 
 	datasetFiles = ["dataset/noisy_circles_300.csv", "dataset/noisy_moons_300.csv", "dataset/blobs_600.csv", "dataset/noisy_circles_600.csv", "dataset/noisy_moons_600.csv", "dataset/blobs_600.csv", "dataset/noisy_circles_1000.csv", "dataset/noisy_moons_1000.csv", "dataset/blobs_1000.csv"]
 
-	lower = 0.0
-	upper = 1.1
-	length = 10
-	epsValues = [lower + x*(upper-lower)/length for x in range(length)]
-	epsValues.append(1)
-
-	f = open("quickDBSCANPerformance.txt","a+")
+	epsValues = [0.1, 0.25, 0.5, 0.8, 1]
 
 	for datasetFile in datasetFiles:
 		simpleDBSCANTimes = list()
 		kdTreeIdxCreationTimes = list()
 		kdTreeDBSCANTimes = list()
 		quickDBSCANTimes = list()
+		f = open("quickDBSCANPerformance.txt","a+")
 		f.write('FILE '+str(datasetFile)+'=====================\n')
 		f.write('\n\n')
 		for eps in epsValues:
 			(dataset, datasetQuick) = createDataset(datasetFile)
 
-			simpleDBSCAN = DBSCAN(eps, 5, dataset)
+			'''simpleDBSCAN = DBSCAN(eps, 5, dataset)
 			start = time.time()
 			simpleDBSCAN.doDbscan()
 			end = time.time()
@@ -498,7 +493,7 @@ if __name__ == '__main__':
 			start = time.time()
 			dbscan.doDbscan()
 			end = time.time()
-			kdTreeDBSCANTimes.append((end - start))
+			kdTreeDBSCANTimes.append((end - start))'''
 
 			quickDBSCANInstance = quickDBSCAN(eps)
 
@@ -520,7 +515,7 @@ if __name__ == '__main__':
 
 		f.write('quickDBSCAN times for all eps '+str(quickDBSCANTimes)+'\n')
 		
-	f.close()
+		f.close()
 
 
 
