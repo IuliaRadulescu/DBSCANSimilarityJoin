@@ -120,7 +120,10 @@ class DBSCANKDtreeSimilarityJoin:
 		self.dataset = dataset
 		#clean collection
 		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
-		self.mongoConnectInstance.remove("kdTreeDBSCAN", {})
+		self.mongoConnectInstance.dropCollection("kdTreeDBSCAN")
+
+	def cleanup(self):
+		self.mongoConnectInstance.dropCollection("kdTreeDBSCAN")
 
 	def buildIndex(self):
 		datasetForIndex = np.delete(self.dataset, 2, 1) #eliminate the third dimension which is the cluster id
@@ -175,7 +178,11 @@ class quickDBSCAN:
 		self.eps = eps
 		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
 		#clean collection
-		self.mongoConnectInstance.remove("quickDBSCAN", {})
+		self.mongoConnectInstance.dropCollection("quickDBSCAN")
+
+	
+	def cleanup(self):
+		self.mongoConnectInstance.dropCollection("quickDBSCAN")
 
 	def randomObject(self, objs):
 		randomIndex = randint(0, len(objs)-1)
@@ -435,6 +442,7 @@ def createDataset(datasetFilename):
 			datasetQuick.append( ( round(float(row[0]), 3), round(float(row[1]), 3) ) )
 
 	dataset = np.array( list( set (dataset) ))
+	datasetQuick = list( (set (datasetQuick)))
 
 	return (dataset, datasetQuick)
 
@@ -478,13 +486,14 @@ if __name__ == '__main__':
 		for eps in epsValues:
 			(dataset, datasetQuick) = createDataset(datasetFile)
 
-			'''simpleDBSCAN = DBSCAN(eps, 5, dataset)
+			simpleDBSCAN = DBSCAN(eps, 5, dataset)
 			start = time.time()
 			simpleDBSCAN.doDbscan()
 			end = time.time()
 			simpleDBSCANTimes.append((end - start))
 
 			dbscan = DBSCANKDtreeSimilarityJoin(eps, dataset)
+			dbscan.cleanup()
 			start = time.time()
 			dbscan.buildIndex()
 			end = time.time()
@@ -493,10 +502,10 @@ if __name__ == '__main__':
 			start = time.time()
 			dbscan.doDbscan()
 			end = time.time()
-			kdTreeDBSCANTimes.append((end - start))'''
+			kdTreeDBSCANTimes.append((end - start))
 
 			quickDBSCANInstance = quickDBSCAN(eps)
-
+			quickDBSCANInstance.cleanup()
 			start = time.time()
 			quickDBSCANInstance.quickJoin(datasetQuick, 10)
 			quickDBSCANInstance.finalFindAndMerge(datasetQuick)

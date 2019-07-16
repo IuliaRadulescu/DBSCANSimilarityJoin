@@ -42,3 +42,6 @@ class MongoDBConnector:
 
 	def count(self, collection, filter):
 		return self.db[collection].count(filter)
+
+	def dropCollection(self, collection):
+		self.db[collection].drop()
