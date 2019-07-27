@@ -255,6 +255,22 @@ class quickDBSCAN:
 				maxDist = dist
 		return maxDist/2
 
+	def bounding_box_naive(self, points):
+		"""returns a list containing the bottom left and the top right 
+		points in the sequence
+		Here, we use min and max four times over the collection of points
+		"""
+		bot_left_x = min(point[0] for point in points)
+		bot_left_y = min(point[1] for point in points)
+		top_right_x = max(point[0] for point in points)
+		top_right_y = max(point[1] for point in points)
+
+		return [(bot_left_x, bot_left_y), (top_right_x, top_right_y)]
+
+	def cornerVantagePoint(self, dataset):
+		corners = self.bounding_box_naive(dataset)
+		return [corners[0][0], corners[0][1]]
+
 	def partition(self, objs, p1):
 		partL = []
 		partG = []
@@ -326,8 +342,8 @@ class quickDBSCAN:
 			self.nestedLoop(objs)
 			return
 
-		p1 = self.randomObject(objs)
-		#p1 = self.centeroidnp(objs)
+		#p1 = self.randomObject(objs)
+		p1 = self.cornerVantagePoint(objs)
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
 		
@@ -365,8 +381,8 @@ class quickDBSCAN:
 
 		allObjects = objs1 + objs2
 
-		p1 = self.randomObject(allObjects)
-		#p1 = self.centeroidnp(allObjects)
+		#p1 = self.randomObject(allObjects)
+		p1 = self.cornerVantagePoint(allObjects)
 
 		(partL1, partG1, winL1, winG1) = self.partition(objs1, p1)
 		(partL2, partG2, winL2, winG2) = self.partition(objs2, p1)
