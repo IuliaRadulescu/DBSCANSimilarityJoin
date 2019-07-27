@@ -546,6 +546,7 @@ def plotFiles():
 
 		subplotNr = subplotNr + 1;
 
+	plt.tight_layout()
 	plt.show()
 
 plotFiles()
