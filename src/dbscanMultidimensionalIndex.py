@@ -173,9 +173,13 @@ class DBSCANKDtreeSimilarityJoin:
 		self.finalFindAndMerge()
 
 class quickDBSCAN:
-	def __init__(self, eps):
+	def __init__(self, eps, pivotChoosingStrategy):
 		#int
 		self.eps = eps
+
+		#pivot choosing strategy: 1 = corner, 2 = random
+		self.pivotChoosingStrategy = pivotChoosingStrategy
+
 		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
 		#clean collection
 		self.mongoConnectInstance.dropCollection("quickDBSCAN")
@@ -342,8 +346,10 @@ class quickDBSCAN:
 			self.nestedLoop(objs)
 			return
 
-		#p1 = self.randomObject(objs)
-		p1 = self.cornerVantagePoint(objs)
+		if (self.pivotChoosingStrategy == 1):
+			p1 = self.cornerVantagePoint(objs)
+		else:
+			p1 = self.randomObject(objs)
 		
 		(partL, partG, winL, winG) = self.partition(objs, p1)
 		
@@ -381,8 +387,10 @@ class quickDBSCAN:
 
 		allObjects = objs1 + objs2
 
-		#p1 = self.randomObject(allObjects)
-		p1 = self.cornerVantagePoint(allObjects)
+		if (self.pivotChoosingStrategy == 1):
+			p1 = self.cornerVantagePoint(allObjects)
+		else:
+			p1 = self.randomObject(allObjects)
 
 		(partL1, partG1, winL1, winG1) = self.partition(objs1, p1)
 		(partL2, partG2, winL2, winG2) = self.partition(objs2, p1)
@@ -515,7 +523,7 @@ def computeRuntimes():
 			end = time.time()
 			kdTreeDBSCANTimes.append((end - start))
 
-			quickDBSCANInstance = quickDBSCAN(eps)
+			quickDBSCANInstance = quickDBSCAN(eps, 1)
 			quickDBSCANInstance.cleanup()
 			start = time.time()
 			quickDBSCANInstance.quickJoin(datasetQuick, 10)
@@ -547,9 +555,8 @@ def plotFiles():
 		eps = datasetFileEps[1]
 		(dataset, datasetQuick) = createDataset(datasetFile)
 
-		quickDBSCANInstance = quickDBSCAN(eps)
+		quickDBSCANInstance = quickDBSCAN(eps, 1)
 		quickDBSCANInstance.cleanup()
-		start = time.time()
 		quickDBSCANInstance.quickJoin(datasetQuick, 10)
 		quickDBSCANInstance.finalFindAndMerge(datasetQuick)
 		finalPairs = quickDBSCANInstance.returnPairs()
@@ -565,7 +572,33 @@ def plotFiles():
 	plt.tight_layout()
 	plt.show()
 
-plotFiles()
+def pivotDifferences():
+
+	datasetFilesPlot = [ ("dataset/noisy_circles_300.csv", 0.25), ("dataset/noisy_moons_300.csv", 0.25), ("dataset/blobs_300.csv", 1)]
+	subplotNr = 1;
+	figId = ['a', 'b', 'c']
+	for datasetFileEps in datasetFilesPlot:
+		datasetFile = datasetFileEps[0]
+		eps = datasetFileEps[1]
+		(dataset, datasetQuick) = createDataset(datasetFile)
+		
+		quickDBSCANInstance = quickDBSCAN(eps, 1)
+		quickDBSCANInstance.cleanup()
+		start = time.time()
+		quickDBSCANInstance.quickJoin(datasetQuick, 10)
+		quickDBSCANInstance.finalFindAndMerge(datasetQuick)
+		end = time.time()
+		print('Vantage, File '+ str(datasetFile) + ' Time ' + str(end-start));
+
+		quickDBSCANInstance = quickDBSCAN(eps, 2)
+		quickDBSCANInstance.cleanup()
+		start = time.time()
+		quickDBSCANInstance.quickJoin(datasetQuick, 10)
+		quickDBSCANInstance.finalFindAndMerge(datasetQuick)
+		end = time.time()
+		print('Random, File '+ str(datasetFile) + ' Time ' + str(end-start));
+
+pivotDifferences()
 
 
 
