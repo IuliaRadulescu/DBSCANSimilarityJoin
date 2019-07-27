@@ -261,7 +261,7 @@ class quickDBSCAN:
 		winL = []
 		winG = []
 		
-		r = round(self.ball_average(objs, p1), 2)
+		r = round(self.ball_median(objs, p1), 2)
 	
 		startIdx = 0
 		endIdx = len(objs)-1
@@ -430,6 +430,15 @@ class quickDBSCAN:
 				
 		plt.show()
 
+	def returnPairs(self):
+		finalPairs = []
+		cursor = self.mongoConnectInstance.getRecords("quickDBSCAN", {}, {"bucket"})
+		for document in cursor:
+			coordsInDocument = list()
+			color = np.random.rand(3,)
+			for pair in document["bucket"]:
+				finalPairs.append((pair[0], pair[1], color))
+		return finalPairs;
 
 def createDataset(datasetFilename):
 	dataset = list()
@@ -448,31 +457,17 @@ def createDataset(datasetFilename):
 
 if __name__ == '__main__':
 
+	'''
+	noisy_circles_300 = 0.25
+	blobls_300 = 1
+	noisy_moons_300 = 0.25
+	'''
+
 	sys.setrecursionlimit(15000)
 
-	#read the csv
-	#datasetFilename = sys.argv[1]
-
-	'''dbscan = DBSCANRtree(1, 5, dataset)
-
-	start = time.time()
-
-	dbscan.buildIndex(5, 5)
-
-	end = time.time()
-
-	print('DBSCANRtree buildIndex took '+str(end - start))
-
-	start = time.time()
-
-	dbscan.doDbscan()
-
-	end = time.time()
-
-	print('DBSCANRtree took '+str(end - start))'''
+def computeRuntimes():
 
 	datasetFiles = ["dataset/noisy_circles_300.csv", "dataset/noisy_moons_300.csv", "dataset/blobs_600.csv", "dataset/noisy_circles_600.csv", "dataset/noisy_moons_600.csv", "dataset/blobs_600.csv", "dataset/noisy_circles_1000.csv", "dataset/noisy_moons_1000.csv", "dataset/blobs_1000.csv"]
-
 	epsValues = [0.1, 0.25, 0.5, 0.8, 1]
 
 	for datasetFile in datasetFiles:
@@ -525,6 +520,37 @@ if __name__ == '__main__':
 		f.write('quickDBSCAN times for all eps '+str(quickDBSCANTimes)+'\n')
 		
 		f.close()
+
+def plotFiles():
+
+	datasetFilesPlot = [ ("dataset/noisy_circles_300.csv", 0.25), ("dataset/noisy_moons_300.csv", 0.25), ("dataset/blobs_300.csv", 1)]
+	subplotNr = 1;
+	figId = ['a', 'b', 'c']
+	for datasetFileEps in datasetFilesPlot:
+		datasetFile = datasetFileEps[0]
+		eps = datasetFileEps[1]
+		(dataset, datasetQuick) = createDataset(datasetFile)
+
+		quickDBSCANInstance = quickDBSCAN(eps)
+		quickDBSCANInstance.cleanup()
+		start = time.time()
+		quickDBSCANInstance.quickJoin(datasetQuick, 10)
+		quickDBSCANInstance.finalFindAndMerge(datasetQuick)
+		finalPairs = quickDBSCANInstance.returnPairs()
+
+		plt.subplot(1, 3, subplotNr) #number of rows, number of columns, and which subplot you're currently on
+		
+		for finalPair in finalPairs:
+			plt.scatter(finalPair[0], finalPair[1], c=finalPair[2])
+		plt.title('Fig 1 ('+str(figId[subplotNr-1])+')')
+
+		subplotNr = subplotNr + 1;
+
+	plt.show()
+
+plotFiles()
+
+
 
 
 
