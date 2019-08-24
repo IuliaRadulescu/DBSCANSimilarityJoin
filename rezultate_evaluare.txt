@@ -1,0 +1,75 @@
+kdTreeDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+quickDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+kdTreeDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+quickDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+kdTreeDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  0.9933778519755148
+ARI:  0.9850000452433365
+quickDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+kdTreeDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+quickDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+kdTreeDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+quickDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+kdTreeDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  0.9933778519755148
+ARI:  0.9850000452433365
+quickDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+kdTreeDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+quickDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0
+kdTreeDBSCAN
+Purity:  1.0
+Entropy:  0.0
+RI:  1.0
+ARI:  1.0

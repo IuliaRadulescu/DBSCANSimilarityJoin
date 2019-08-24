@@ -14,6 +14,7 @@ from bson.objectid import ObjectId
 import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
 from copy import deepcopy
+import evaluation_measures
 
 
 class DBSCAN:
@@ -119,6 +120,10 @@ class DBSCANKDtreeSimilarityJoin:
 		self.eps = eps
 		self.dataset = dataset
 		#clean collection
+
+		#number of dimension 
+		self.no_dims = 2
+		
 		self.mongoConnectInstance = mongoConnect.MongoDBConnector("QuickDBScanDB")
 		self.mongoConnectInstance.dropCollection("kdTreeDBSCAN")
 
@@ -150,6 +155,57 @@ class DBSCANKDtreeSimilarityJoin:
 				plt.scatter(pair[0], pair[1], c=color)
 				#plt.text(pair[0], pair[1], str(pair[0])+', '+str(pair[1]))
 		plt.show()
+
+	def evaluateClusters(self, clase_points):
+
+		evaluation_dict = {}
+		point2cluster = {}
+		point2class = {}
+
+		cluster_points = collections.defaultdict(list)
+		cursor = self.mongoConnectInstance.getRecords("kdTreeDBSCAN", {}, {"bucket"})
+		clusterId = 1
+		for document in cursor:
+			coordsInDocument = list()
+			color = np.random.rand(3,)
+			for pair in document["bucket"]:
+				cluster_points[clusterId].append( (pair[0], pair[1], clusterId) )
+			clusterId = clusterId + 1
+
+		idx = 0
+		for elem in clase_points:
+			evaluation_dict[idx] = {}
+			for points in clase_points[elem]:
+				point2class[points] = idx
+			idx += 1
+
+		idx = 0
+		for elem in cluster_points:
+			for point in cluster_points[elem]:
+				index_dict = list()
+				for dim in range(self.no_dims):
+					index_dict.append(point[dim])
+				point2cluster[tuple(index_dict)] = idx
+			for c in evaluation_dict:
+				evaluation_dict[c][idx] = 0
+			idx += 1
+
+		for point in point2cluster:
+			evaluation_dict[point2class[point]][point2cluster[point]] += 1
+				
+
+		print('Purity:  ', evaluation_measures.purity(evaluation_dict))
+		print('Entropy: ', evaluation_measures.entropy(evaluation_dict)) # perfect results have entropy == 0
+		print('RI       ', evaluation_measures.rand_index(evaluation_dict))
+		print('ARI      ', evaluation_measures.adj_rand_index(evaluation_dict))
+
+		f = open("rezultate_evaluare.txt", "a")
+		f.write('kdTreeDBSCAN'+"\n");
+		f.write('Purity:  '+str(evaluation_measures.purity(evaluation_dict))+"\n")
+		f.write('Entropy:  '+str(evaluation_measures.entropy(evaluation_dict))+"\n")
+		f.write('RI:  '+str(evaluation_measures.rand_index(evaluation_dict))+"\n")
+		f.write('ARI:  '+str(evaluation_measures.adj_rand_index(evaluation_dict))+"\n")
+		f.close()
 	
 	def upsertPixelValue(self, collection, filter, epsNeigh, upsert = True):
 		self.mongoConnectInstance.update(collection, filter, {"$addToSet":{"bucket":{"$each":epsNeigh}}}, upsert, True)
@@ -176,6 +232,9 @@ class quickDBSCAN:
 	def __init__(self, eps, pivotChoosingStrategy):
 		#int
 		self.eps = eps
+
+		#number of dimension 
+		self.no_dims = 2
 
 		#pivot choosing strategy: 1 = corner, 2 = random
 		self.pivotChoosingStrategy = pivotChoosingStrategy
@@ -454,6 +513,59 @@ class quickDBSCAN:
 				
 		plt.show()
 
+	def evaluateClusters(self, clase_points):
+
+		evaluation_dict = {}
+		point2cluster = {}
+		point2class = {}
+
+		cluster_points = collections.defaultdict(list)
+		cursor = self.mongoConnectInstance.getRecords("quickDBSCAN", {}, {"bucket"})
+		clusterId = 1
+		for document in cursor:
+			coordsInDocument = list()
+			color = np.random.rand(3,)
+			for pair in document["bucket"]:
+				cluster_points[clusterId].append( (pair[0], pair[1], clusterId) )
+			clusterId = clusterId + 1
+
+		idx = 0
+		for elem in clase_points:
+			evaluation_dict[idx] = {}
+			for points in clase_points[elem]:
+				point2class[points] = idx
+			idx += 1
+
+		idx = 0
+		for elem in cluster_points:
+			for point in cluster_points[elem]:
+				index_dict = list()
+				for dim in range(self.no_dims):
+					index_dict.append(point[dim])
+				point2cluster[tuple(index_dict)] = idx
+			for c in evaluation_dict:
+				evaluation_dict[c][idx] = 0
+			idx += 1
+
+		for point in point2cluster:
+			evaluation_dict[point2class[point]][point2cluster[point]] += 1
+				
+
+		print('Purity:  ', evaluation_measures.purity(evaluation_dict))
+		print('Entropy: ', evaluation_measures.entropy(evaluation_dict)) # perfect results have entropy == 0
+		print('RI       ', evaluation_measures.rand_index(evaluation_dict))
+		print('ARI      ', evaluation_measures.adj_rand_index(evaluation_dict))
+
+		f = open("rezultate_evaluare.txt", "a")
+		f.write('quickDBSCAN'+"\n");
+		f.write('Purity:  '+str(evaluation_measures.purity(evaluation_dict))+"\n")
+		f.write('Entropy:  '+str(evaluation_measures.entropy(evaluation_dict))+"\n")
+		f.write('RI:  '+str(evaluation_measures.rand_index(evaluation_dict))+"\n")
+		f.write('ARI:  '+str(evaluation_measures.adj_rand_index(evaluation_dict))+"\n")
+		f.close()
+
+
+
 	def returnPairs(self):
 		finalPairs = []
 		cursor = self.mongoConnectInstance.getRecords("quickDBSCAN", {}, {"bucket"})
@@ -478,6 +590,28 @@ def createDataset(datasetFilename):
 	datasetQuick = list( (set (datasetQuick)))
 
 	return (dataset, datasetQuick)
+
+def createDatasetEvaluation(datasetFilename):
+	dataset = list()
+	datasetQuick = list()
+	clase_points = collections.defaultdict(list)
+
+	with open(datasetFilename) as csvFile:
+		csvReader = csv.reader(csvFile, delimiter=',')
+		for row in csvReader:
+			dataset.append( ( round(float(row[0]), 3), round(float(row[1]), 3), 0) )
+			datasetQuick.append( ( round(float(row[0]), 3), round(float(row[1]), 3), int(row[2])) )
+
+	dataset = np.array( list( set (dataset) ))
+	datasetQuick = list( (set (datasetQuick)))
+
+	for datasetItem in datasetQuick:
+		clase_points[datasetItem[2]].append( (datasetItem[0], datasetItem[1]) )
+
+	#strip the class from the dataset
+	datasetQuick = [ (element[0], element[1]) for element in datasetQuick]
+
+	return (dataset, datasetQuick, clase_points)
 
 if __name__ == '__main__':
 
@@ -545,6 +679,28 @@ def computeRuntimes():
 		
 		f.close()
 
+def computeEvaluation():
+
+	datasetFiles = [("dataset/noisy_circles_300_evaluation.csv", 0.25), ("dataset/noisy_moons_300_evaluation.csv", 0.25), ("dataset/blobs_600_evaluation.csv", 1), ("dataset/noisy_circles_600_evaluation.csv", 0.25), ("dataset/noisy_moons_600_evaluation.csv", 0.25), ("dataset/blobs_600_evaluation.csv", 1), ("dataset/noisy_circles_1000_evaluation.csv", 0.25), ("dataset/noisy_moons_1000_evaluation.csv", 0.25), ("dataset/blobs_1000_evaluation.csv", 1)]
+
+	for datasetItem in datasetFiles:
+		datasetFile = datasetItem[0]
+		eps = datasetItem[1]
+
+		(dataset, datasetQuick, clase_points) = createDatasetEvaluation(datasetFile)
+
+		dbscan = DBSCANKDtreeSimilarityJoin(eps, dataset)
+		dbscan.cleanup()
+		dbscan.buildIndex()
+		dbscan.doDbscan()
+		dbscan.evaluateClusters(clase_points)
+		
+		quickDBSCANInstance = quickDBSCAN(eps, 1)
+		quickDBSCANInstance.cleanup()
+		quickDBSCANInstance.quickJoin(datasetQuick, 10)
+		quickDBSCANInstance.finalFindAndMerge(datasetQuick)
+		quickDBSCANInstance.evaluateClusters(clase_points)
+
 def plotFiles():
 
 	datasetFilesPlot = [ ("dataset/noisy_circles_300.csv", 0.25), ("dataset/noisy_moons_300.csv", 0.25), ("dataset/blobs_300.csv", 1)]
@@ -598,7 +754,7 @@ def pivotDifferences():
 		end = time.time()
 		print('Random, File '+ str(datasetFile) + ' Time ' + str(end-start));
 
-pivotDifferences()
+computeEvaluation()
 
 
 
